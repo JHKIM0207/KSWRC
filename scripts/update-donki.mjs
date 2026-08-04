@@ -1,4 +1,4 @@
-// Fetches NASA DONKI FLR (flare) events (last 5 days) and saves as static JSON
+// Fetches NASA DONKI FLR (flare) events (last 7 days) and saves as static JSON
 // in the repo so the page can read them same-origin, avoiding browser CORS/proxy flakiness.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -14,8 +14,8 @@ function dateRange(days) {
 }
 
 async function fetchType(type) {
-  const { start, end } = dateRange(5);
-  const url = `https://api.nasa.gov/DONKI/${type}?startDate=${start}&endDate=${end}&api_key=${API_KEY}`;
+  const { start, end } = dateRange(7);
+  const url = `https://kauai.ccmc.gsfc.nasa.gov/DONKI/WS/get/${type}?startDate=${start}&endDate=${end}`;
   const r = await fetch(url, { cache: 'no-store' });
   if (!r.ok) throw new Error(`${type} -> HTTP ${r.status}`);
   return r.json();

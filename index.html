@@ -45,8 +45,8 @@
 .spark-wrap{margin-top:12px}
 .spark-wrap h5{margin:0 0 8px;font-size:15px;color:#d7e8ff}
 .spark{width:100%;height:120px;display:block;background:rgba(255,255,255,.02);border-radius:12px}
-.sunspot-mini-table{margin-top:10px;font-size:13px;color:#cfe0f5;max-height:160px;overflow:auto;border-top:1px solid rgba(255,255,255,.08);padding-top:8px}
-.sunspot-mini-row{display:grid;grid-template-columns:90px 1fr 70px 70px;gap:8px;padding:3px 0}
+.sunspot-mini-table{margin-top:10px;font-size:13px;color:#cfe0f5;border-top:1px solid rgba(255,255,255,.08);padding-top:8px}
+.sunspot-mini-row{display:grid;grid-template-columns:88px 92px 64px 60px;gap:8px;padding:3px 0;text-align:left}
 .sunspot-mini-head{font-weight:700;color:#fff}
 @media (max-width:980px){.solar-disk-wrap{grid-template-columns:1fr}.region-stats{grid-template-columns:1fr 1fr}}
 .data-source-note{margin-top:12px;padding:10px 12px;border:1px solid rgba(110,180,255,.16);border-radius:12px;background:rgba(255,255,255,.025);font-size:12px;line-height:1.55;color:#9fb5d1}.data-source-note a{color:#6dd6ff;text-decoration:none}.data-source-note a:hover{text-decoration:underline}
@@ -215,7 +215,7 @@
 const URL={scales:"https://services.swpc.noaa.gov/products/noaa-scales.json",kp:"https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json",kpForecast:"https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json",dst:"https://services.swpc.noaa.gov/json/geospace/geospace_dst_7_day.json",wind:"https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json",mag:"https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json",xray:"https://services.swpc.noaa.gov/json/goes/primary/xrays-7-day.json",xrayFallback:"https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json",proton:"https://services.swpc.noaa.gov/json/goes/primary/integral-protons-7-day.json",electron:"https://services.swpc.noaa.gov/json/goes/secondary/integral-electrons-7-day.json",glotecManifest:"https://services.swpc.noaa.gov/products/glotec/geojson_2d_urt.json",glotecBase:"https://services.swpc.noaa.gov/products/glotec/geojson_2d_urt/",enlil:"https://services.swpc.noaa.gov/products/animations/enlil.json"};
 const state={data:{},loading:false,enlilIndex:0,enlilPlaying:false,enlilTimer:null};const $=id=>document.getElementById(id);
 function donkiRange(days){const end=new Date(),start=new Date(end.getTime()-days*864e5),f=x=>x.toISOString().slice(0,10);return {start:f(start),end:f(end)}}
-function buildDonkiUrl(type,days=3){const {start,end}=donkiRange(days);return `https://api.nasa.gov/DONKI/${type}?startDate=${start}&endDate=${end}&api_key=ELqmf5t53DLXh0h1K3aKiaTWamKenTg7RzP8pnd5`}
+function buildDonkiUrl(type,days=3){const {start,end}=donkiRange(days);return `https://kauai.ccmc.gsfc.nasa.gov/DONKI/WS/get/${type}?startDate=${start}&endDate=${end}`}
 function fetchDonki(type,days=3){
   const local=`./data/donki/${type.toLowerCase()}.json`;
   const direct=buildDonkiUrl(type,days),nonce=Date.now();
@@ -283,7 +283,7 @@ function renderDonki(d){
   flrList.innerHTML=failed.has('flr')&&!flr.length?failNote:flr.length?flr.map(e=>{
     const t=e.beginTime?new Date(e.beginTime).toISOString().slice(0,16).replace('T',' ')+' UTC':'--';
     return `<div class="event-item">${e.classType||'?'} 플레어 · ${t} · AR${e.activeRegionNum||'-'}</div>`;
-  }).join(''):'<div class="event-empty">최근 5일 내 주요 플레어 없음</div>';
+  }).join(''):'<div class="event-empty">최근 7일 내 주요 플레어 없음</div>';
   const gstList=$('gst-list'),sepList=$('sep-list');
   if(gstList){
     const kpFailed=failed.has('kp');
@@ -625,7 +625,7 @@ async function loadAll(){
     kp:()=>safeFetch(URL.kp),
     dst:()=>safeFetch(URL.dst),
     cme:()=>fetchCactus(),
-    flr:()=>fetchDonki('FLR',5),
+    flr:()=>fetchDonki('FLR',7),
     wind:()=>safeFetch(URL.wind),
     mag:()=>safeFetch(URL.mag),
     xray:()=>safeFetchAny([URL.xray,URL.xrayFallback]),
@@ -1177,7 +1177,13 @@ function drawSolarDisk(){
   let shown=0;
   solarRegionsData.forEach(r=>{
     const pos=parseRegionLoc(r);if(!pos)return;
-    const q=projectHeliographic(pos.lat,pos.lon,new Date());if(!q)return;
+    const obsMs=Date.parse(/Z$|[+-]\d\d:?\d\d$/.test(r.observed||'')?r.observed:(r.observed||'')+'Z');
+    let lon=pos.lon;
+    if(Number.isFinite(obsMs)){
+      const deltaDays=(Date.now()-obsMs)/864e5;
+      lon=pos.lon+13.2*deltaDays;
+    }
+    const q=projectHeliographic(pos.lat,lon,new Date());if(!q)return;
     const xp=50-q.x*46.8, yp=50-q.y*46.8;
     if(xp<1||xp>99||yp<1||yp>99)return;
     const px=xp/100*cvs.width, py=yp/100*cvs.height;
@@ -1195,13 +1201,20 @@ function drawSolarDisk(){
     ctx.fillStyle=selected?'#7ee7b7':'#ffffff';
     ctx.fillText(`AR ${r.ar}`,px,py-30);
     if(selected){
+      const r2=Math.hypot(q.x,q.y);
+      const radialAngle=r2>0.001?Math.atan2(-q.y,-q.x):0;
+      const baseR=38;
+      ctx.save();
+      ctx.translate(px,py);
+      ctx.rotate(radialAngle);
       ctx.beginPath();
       ctx.setLineDash([9,7]);
       ctx.lineWidth=3;
       ctx.strokeStyle='rgba(255,255,255,.95)';
-      ctx.arc(px,py,38,0,Math.PI*2);
+      ctx.ellipse(0,0,baseR*Math.max(q.z,.15),baseR,0,0,Math.PI*2);
       ctx.stroke();
       ctx.setLineDash([]);
+      ctx.restore();
     }
     ctx.restore();
 
@@ -1224,7 +1237,7 @@ function getSunspotSeries(ar){
     if(String(rawAr)!==key)return;
     const row=normalizeRegion(raw), ds=(row.observed||obsTime(raw)).slice(0,10);
     if(!ds)return;
-    const candidate={date:ds,area:row.area,spots:row.spots,loc:row.loc,source};
+    const candidate={date:ds,area:row.area,spots:row.spots,loc:row.loc,mc:row.mc,mag:row.mag,m:row.m,x:row.x,source};
     const old=byDay[ds];
     if(!old || candidate.area>old.area || (candidate.area===old.area&&candidate.spots>old.spots))byDay[ds]=candidate;
   };
@@ -1235,8 +1248,43 @@ function getSunspotSeries(ar){
   for(const raw of sunspotReportData||[])addRow(raw,'sunspot_report');
   return Object.values(byDay).sort((a,b)=>a.date.localeCompare(b.date)).slice(-14);
 }
-function drawSpark(canvasId,series,key,color,label){const c=document.getElementById(canvasId);if(!c)return;const d=Math.min(devicePixelRatio||1,2),w=c.clientWidth,h=c.clientHeight;c.width=w*d;c.height=h*d;const ctx=c.getContext('2d');ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,w,h);ctx.strokeStyle='rgba(255,255,255,.1)';for(let i=0;i<4;i++){const yy=12+i*(h-28)/3;ctx.beginPath();ctx.moveTo(40,yy);ctx.lineTo(w-10,yy);ctx.stroke()}if(!series.length){ctx.fillStyle='#9fb5d1';ctx.font='14px system-ui';ctx.fillText('No recent region history is available for this AR.',12,h/2);return}const vals=series.map(d=>Number(d[key]||0)),min=Math.min(...vals),max=Math.max(...vals,min+1),x=i=>40+(w-55)*(series.length===1?.5:i/(series.length-1)),y=v=>h-22-(h-42)*((v-min)/(max-min||1));ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.beginPath();series.forEach((d,i)=>i?ctx.lineTo(x(i),y(d[key])):ctx.moveTo(x(i),y(d[key])));ctx.stroke();ctx.fillStyle=color;series.forEach((d,i)=>{ctx.beginPath();ctx.arc(x(i),y(d[key]),3.5,0,Math.PI*2);ctx.fill()});ctx.fillStyle='#d7e8ff';ctx.font='12px system-ui';ctx.fillText(`${label} (${min}–${max})`,10,14);ctx.textAlign='center';series.forEach((d,i)=>{ctx.fillStyle='#8ea6c6';ctx.fillText(d.date.slice(5),x(i),h-5)})}
-function showRegionDetail(r){selectedRegion=r;requestAnimationFrame(()=>drawSolarDisk());const box=document.getElementById('region-detail-panel'),series=getSunspotSeries(r.ar);const flrs=(state.data.flr||[]).filter(f=>String(f.activeRegionNum)===String(r.ar)).sort((a,b)=>new Date(b.beginTime)-new Date(a.beginTime));const flareHistoryHtml=flrs.length?`<div class="sunspot-mini-table" style="margin-top:10px"><div class="sunspot-mini-row sunspot-mini-head"><div>Class</div><div>Begin (UTC)</div><div>Peak (UTC)</div><div>End (UTC)</div></div>${flrs.map(f=>`<div class="sunspot-mini-row"><div>${f.classType||'?'}</div><div>${f.beginTime?f.beginTime.slice(0,16).replace('T',' '):'-'}</div><div>${f.peakTime?f.peakTime.slice(0,16).replace('T',' '):'-'}</div><div>${f.endTime?f.endTime.slice(0,16).replace('T',' '):'-'}</div></div>`).join('')}</div>`:'<div class="muted" style="margin-top:10px">최근 3일 내 이 활동영역의 플레어 기록 없음</div>';box.innerHTML=`<h4>AR ${r.ar}</h4><div class="muted">${r.loc} · Magnetic ${r.mag} · McIntosh ${r.mc} (${mcIntoshComplexity(r.mc).level})</div><div class="mc-explain"><strong>McIntosh 복잡도:</strong> ${mcIntoshComplexity(r.mc).detail}</div><div class="region-stats"><div class="trend-box"><div class="k">Current Area</div><div class="v">${r.area}</div></div><div class="trend-box"><div class="k">Current Spots</div><div class="v">${r.spots}</div></div><div class="trend-box"><div class="k">M Probability</div><div class="v">${r.m}%</div></div><div class="trend-box"><div class="k">X Probability</div><div class="v">${r.x}%</div></div></div><h5 style="margin:12px 0 4px">Flare History (NASA DONKI, 3일)</h5>${flareHistoryHtml}<div class="spark-wrap"><h5>Area Trend</h5><canvas id="spark-area" class="spark"></canvas></div><div class="spark-wrap"><h5>Spot Count Trend</h5><canvas id="spark-spots" class="spark"></canvas></div><div class="sunspot-mini-table"><div class="sunspot-mini-row sunspot-mini-head"><div>Date</div><div>Location</div><div>Area</div><div>Spots</div></div>${series.map(s=>`<div class="sunspot-mini-row"><div>${s.date}</div><div>${s.loc}</div><div>${s.area}</div><div>${s.spots}</div></div>`).join('')}</div><div class="data-source-note">Area and spot-count history uses NOAA SWPC daily composite region observations. These are combined reports from multiple observatories and may not represent a single instantaneous measurement.<br><a href="https://services.swpc.noaa.gov/json/solar_regions.json" target="_blank" rel="noopener">solar_regions.json ↗</a> · <a href="https://services.swpc.noaa.gov/json/sunspot_report.json" target="_blank" rel="noopener">sunspot_report.json ↗</a> · <a href="https://www.spaceweather.gov/products/summary-space-weather-observations" target="_blank" rel="noopener">NOAA product description ↗</a></div>`;requestAnimationFrame(()=>{drawSpark('spark-area',series,'area','#ffb84d','Area');drawSpark('spark-spots',series,'spots','#59d0ff','Spots')})}
+function drawSpark(canvasId,series,key,color,label){
+  const c=document.getElementById(canvasId);if(!c)return;
+  const d=Math.min(devicePixelRatio||1,2),w=c.clientWidth,h=c.clientHeight;c.width=w*d;c.height=h*d;
+  const ctx=c.getContext('2d');ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,w,h);
+  const ml=40,mr=34;
+  ctx.strokeStyle='rgba(255,255,255,.1)';for(let i=0;i<4;i++){const yy=12+i*(h-28)/3;ctx.beginPath();ctx.moveTo(ml,yy);ctx.lineTo(w-mr,yy);ctx.stroke()}
+  if(!series.length){ctx.fillStyle='#9fb5d1';ctx.font='14px system-ui';ctx.fillText('No recent region history is available for this AR.',12,h/2);c._spec=null;return}
+  const vals=series.map(dd=>Number(dd[key]||0)),min=Math.min(...vals),max=Math.max(...vals,min+1);
+  const x=i=>ml+(w-ml-mr)*(series.length===1?.5:i/(series.length-1)),y=v=>h-22-(h-42)*((v-min)/(max-min||1));
+  ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.beginPath();series.forEach((dd,i)=>i?ctx.lineTo(x(i),y(dd[key])):ctx.moveTo(x(i),y(dd[key])));ctx.stroke();
+  ctx.fillStyle=color;series.forEach((dd,i)=>{ctx.beginPath();ctx.arc(x(i),y(dd[key]),3.5,0,Math.PI*2);ctx.fill()});
+  ctx.fillStyle='#8ea6c6';ctx.font='11px system-ui';ctx.textAlign='right';ctx.textBaseline='middle';
+  ctx.fillText(String(max),ml-6,12);ctx.fillText(String(min),ml-6,h-22);
+  ctx.textAlign='center';series.forEach((dd,i)=>{ctx.fillStyle='#8ea6c6';ctx.fillText(dd.date.slice(5),x(i),h-5)});
+  c._spec={series,key,x,y,color,label,min,max,w,h};
+  if(!c.dataset.sparkBound){
+    c.dataset.sparkBound='1';
+    c.addEventListener('pointermove',e=>{
+      const spec=c._spec;if(!spec)return;
+      const r=c.getBoundingClientRect(),px=(e.clientX-r.left);
+      let nearest=0,best=Infinity;
+      spec.series.forEach((dd,i)=>{const dist=Math.abs(spec.x(i)-px);if(dist<best){best=dist;nearest=i}});
+      const dd=spec.series[nearest],vx=spec.x(nearest),vy=spec.y(dd[spec.key]);
+      const ctx2=c.getContext('2d');
+      drawSpark(canvasId,spec.series,spec.key,spec.color,spec.label);
+      ctx2.save();ctx2.strokeStyle='rgba(255,255,255,.35)';ctx2.setLineDash([3,3]);ctx2.beginPath();ctx2.moveTo(vx,12);ctx2.lineTo(vx,spec.h-22);ctx2.stroke();ctx2.setLineDash([]);
+      ctx2.fillStyle=spec.color;ctx2.beginPath();ctx2.arc(vx,vy,5,0,Math.PI*2);ctx2.fill();ctx2.strokeStyle='#04101b';ctx2.lineWidth=1.5;ctx2.stroke();
+      const text=`${dd.date}: ${dd[spec.key]}`;ctx2.font='12px system-ui';const tw=ctx2.measureText(text).width+16;
+      const bx=Math.min(Math.max(vx-tw/2,2),spec.w-tw-2),by=Math.max(vy-30,2);
+      ctx2.fillStyle='rgba(5,11,20,.95)';ctx2.strokeStyle='rgba(255,255,255,.25)';ctx2.beginPath();ctx2.roundRect(bx,by,tw,20,5);ctx2.fill();ctx2.stroke();
+      ctx2.fillStyle='#eef6ff';ctx2.textAlign='left';ctx2.textBaseline='middle';ctx2.fillText(text,bx+8,by+10);
+      ctx2.restore();
+    });
+    c.addEventListener('pointerleave',()=>drawSpark(canvasId,c._spec.series,c._spec.key,c._spec.color,c._spec.label));
+  }
+}
+function showRegionDetail(r){selectedRegion=r;requestAnimationFrame(()=>drawSolarDisk());const box=document.getElementById('region-detail-panel'),series=getSunspotSeries(r.ar);const flrs=(state.data.flr||[]).filter(f=>String(f.activeRegionNum)===String(r.ar)).sort((a,b)=>new Date(b.beginTime)-new Date(a.beginTime));const flareHistoryHtml=flrs.length?`<div class="sunspot-mini-table" style="margin-top:10px"><div class="sunspot-mini-row sunspot-mini-head"><div>Class</div><div>Begin (UTC)</div><div>Peak (UTC)</div><div>End (UTC)</div></div>${flrs.map(f=>`<div class="sunspot-mini-row"><div>${f.classType||'?'}</div><div>${f.beginTime?f.beginTime.slice(0,16).replace('T',' '):'-'}</div><div>${f.peakTime?f.peakTime.slice(0,16).replace('T',' '):'-'}</div><div>${f.endTime?f.endTime.slice(0,16).replace('T',' '):'-'}</div></div>`).join('')}</div>`:'<div class="muted" style="margin-top:10px">최근 7일 내 이 활동영역의 플레어 기록 없음</div>';box.innerHTML=`<h4>AR ${r.ar}</h4><div class="muted">${r.loc} · Magnetic ${r.mag} · McIntosh ${r.mc} (${mcIntoshComplexity(r.mc).level})</div><div class="mc-explain"><strong>McIntosh 복잡도:</strong> ${mcIntoshComplexity(r.mc).detail}</div><div class="region-stats"><div class="trend-box"><div class="k">Current Area</div><div class="v">${r.area}</div></div><div class="trend-box"><div class="k">Current Spots</div><div class="v">${r.spots}</div></div><div class="trend-box"><div class="k">M Probability</div><div class="v">${r.m}%</div></div><div class="trend-box"><div class="k">X Probability</div><div class="v">${r.x}%</div></div></div><h5 style="margin:12px 0 4px">Flare History (NASA DONKI, 7일)</h5>${flareHistoryHtml}<div class="spark-wrap"><h5>Area Trend</h5><canvas id="spark-area" class="spark"></canvas></div><div class="spark-wrap"><h5>Spot Count Trend</h5><canvas id="spark-spots" class="spark"></canvas></div><div class="sunspot-mini-table" style="margin-top:10px"><div class="sunspot-mini-row sunspot-mini-head" style="grid-template-columns:88px 92px 64px 60px 70px 70px 50px 50px"><div>Date</div><div>Location</div><div>Area</div><div>Spots</div><div>Magnetic</div><div>McIntosh</div><div>M%</div><div>X%</div></div>${series.map(s=>`<div class="sunspot-mini-row" style="grid-template-columns:88px 92px 64px 60px 70px 70px 50px 50px"><div>${s.date}</div><div>${s.loc}</div><div>${s.area}</div><div>${s.spots}</div><div>${s.mag||'-'}</div><div>${s.mc||'-'}</div><div>${Number.isFinite(s.m)?s.m:'-'}</div><div>${Number.isFinite(s.x)?s.x:'-'}</div></div>`).join('')}</div><div class="data-source-note">Area and spot-count history uses NOAA SWPC daily composite region observations. These are combined reports from multiple observatories and may not represent a single instantaneous measurement.<br><a href="https://services.swpc.noaa.gov/json/solar_regions.json" target="_blank" rel="noopener">solar_regions.json ↗</a> · <a href="https://services.swpc.noaa.gov/json/sunspot_report.json" target="_blank" rel="noopener">sunspot_report.json ↗</a> · <a href="https://www.spaceweather.gov/products/summary-space-weather-observations" target="_blank" rel="noopener">NOAA product description ↗</a></div>`;requestAnimationFrame(()=>{drawSpark('spark-area',series,'area','#ffb84d','Area');drawSpark('spark-spots',series,'spots','#59d0ff','Spots')})}
 async function loadSunspotReport(){try{const r=await fetch('https://services.swpc.noaa.gov/json/sunspot_report.json?t='+Date.now(),{cache:'no-store'});sunspotReportData=await r.json()}catch(e){console.warn('sunspot_report failed',e);sunspotReportData=[]}}
 async function loadSolarRegions(){
   const status=document.getElementById('solar-regions-status');
