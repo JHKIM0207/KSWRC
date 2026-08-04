@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OVATION Aurora Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<style>
+:root{color-scheme:dark;--bg:#040811;--panel:#0d1625ed;--panel2:#111d2ee3;--border:#b9d4ed2e;--text:#eef6ff;--muted:#9eb1c8;--good:#73e6a2;--error:#ff9198;--warn:#ffd36b}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(circle at 50% -15%,#173651 0,#08121f 35%,var(--bg) 76%);color:var(--text);font-family:Inter,"Noto Sans KR",Arial,sans-serif}body{padding:8px}.app{width:min(1540px,100%);margin:auto}.dashboard-header{display:none;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:16px}.dashboard-header h1{margin:0;font-size:clamp(25px,3vw,38px)}.dashboard-header p{margin:7px 0 0;color:var(--muted);font-size:14px}.global-status{padding:11px 14px;border:1px solid var(--border);border-radius:12px;background:var(--panel2);min-width:300px;font-size:13px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--warn);margin-right:8px}.dot.good{background:var(--good)}.dot.error{background:var(--error)}
+.section{border:1px solid var(--border);border-radius:18px;background:linear-gradient(180deg,rgba(13,22,37,.93),rgba(6,12,23,.96));padding:13px;margin-bottom:14px}.section-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:12px}.section-head h2{margin:0;font-size:21px}.section-head p{margin:5px 0 0;color:var(--muted);font-size:13px}.section-status{font-size:12px;color:var(--muted);padding-top:3px}.meta{display:grid;grid-template-columns:repeat(6,minmax(125px,1fr));gap:8px;margin-bottom:11px}.card{padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--panel);min-height:66px}.label{font-size:11px;color:var(--muted);margin-bottom:6px}.value{font-size:13px;font-weight:600;line-height:1.35}.controls{display:flex;flex-wrap:wrap;gap:9px 15px;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:11px;background:var(--panel2);margin-bottom:12px}.control{display:flex;align-items:center;gap:7px;font-size:12px}.control label{color:var(--muted)}select,input[type=number]{background:#0b1422;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px}input[type=range]{width:105px}output{min-width:34px;font-variant-numeric:tabular-nums}button{padding:7px 12px;border:1px solid #6dd6ff80;border-radius:9px;background:#3287b12e;color:var(--text);cursor:pointer}button:disabled{opacity:.5}.maps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.map-panel{position:relative;border:1px solid var(--border);border-radius:15px;overflow:hidden;background:radial-gradient(circle,#0a1e45 0,#030914 75%)}.map-title{position:absolute;z-index:2;left:15px;top:13px;pointer-events:none}.map-title strong{display:block;font-size:15px}.map-title span{font-size:11px;color:var(--muted)}.wrap{position:relative;aspect-ratio:1/1}canvas{position:absolute;inset:0;width:100%;height:100%}.legend{display:flex;gap:12px;align-items:center;margin-top:11px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--panel)}.legend-name{font-size:12px;font-weight:600;min-width:220px}.legend-body{flex:1}.bar-prob{height:14px;border:1px solid #ffffff55;border-radius:5px;background:linear-gradient(90deg,transparent 0%,#00961e 8%,#00ff00 22%,#5aff00 38%,#d2ff00 55%,#ffdc00 72%,#ff8200 86%,#ff0000 100%)}.bar-flux{height:14px;border:1px solid #ffffff55;border-radius:5px;background:linear-gradient(90deg,#001040 0%,#0030b8 10%,#00aaff 25%,#00ff45 45%,#d8ff00 65%,#ffb000 82%,#ff0000 100%)}.ticks{display:flex;justify-content:space-between;color:var(--muted);font-size:10px;margin-top:4px}.note{color:var(--muted);font-size:11px;line-height:1.45;margin:9px 2px 0}
+@media(max-width:1080px){.meta{grid-template-columns:repeat(3,1fr)}}@media(max-width:850px){.maps{grid-template-columns:1fr}}@media(max-width:640px){body{padding:8px}.dashboard-header{display:block}.global-status{margin-top:10px;min-width:0}.meta{grid-template-columns:1fr}.legend{display:block}.legend-body{margin-top:7px}}
+</style>
+</head>
+<body>
+<main class="app">
+<header class="dashboard-header"><div><h1>OVATION Aurora Monitoring</h1><p>Geographic aurora probability and magnetic-coordinate energy flux in one vertically stacked dashboard</p></div><div class="global-status" aria-live="polite"><span id="global-dot" class="dot"></span><span id="global-status">초기화 중...</span></div></header>
+
+<section class="section" id="geo-section">
+<div class="section-head"><div><h2>Polar Aurora Forecast</h2><p>지리좌표 기반 오로라 확률 지도 · 태양 방향(낮 중심 경도)이 항상 위쪽</p></div><div id="geo-status" class="section-status">대기 중</div></div>
+<div class="meta">
+<div class="card"><div class="label">Observation (UTC)</div><div id="geo-obs" class="value">--</div></div>
+<div class="card"><div class="label">Forecast (UTC)</div><div id="geo-forecast" class="value">--</div></div>
+<div class="card"><div class="label">Forecast (KST)</div><div id="geo-kst" class="value">--</div></div>
+<div class="card"><div class="label">Maximum Probability</div><div id="geo-max" class="value">-- %</div></div>
+<div class="card"><div class="label">Subsolar Longitude</div><div id="geo-sunlon" class="value">--</div></div>
+<div class="card"><div class="label">Last Checked</div><div id="geo-check" class="value">--</div></div>
+</div>
+<div class="controls">
+<div class="control"><label for="g-threshold">임계값</label><input id="g-threshold" type="range" min="0" max="50" step="1" value="4"><output id="g-threshold-out">4</output></div>
+<div class="control"><label for="g-opacity">투명도</label><input id="g-opacity" type="range" min="20" max="100" step="5" value="100"><output id="g-opacity-out">100%</output></div>
+<div class="control"><label for="g-lat">표시 위도</label><input id="g-lat" type="range" min="40" max="65" step="1" value="40"><output id="g-lat-out">±40°</output></div>
+<div class="control"><label for="g-sigma">Gaussian</label><input id="g-sigma" type="range" min="0" max="4" step="0.5" value="3"><output id="g-sigma-out">3</output></div>
+<div class="control"><label for="g-night">주야 음영</label><input id="g-night" type="checkbox" checked></div>
+<button id="g-refresh">지금 업데이트</button>
+</div>
+<div class="maps">
+<article class="map-panel"><div class="map-title"><strong>Northern Hemisphere</strong><span id="g-n-range">40–90°N · dayward meridian at top</span></div><div id="g-wrap-n" class="wrap"><canvas id="g-canvas-n"></canvas></div></article>
+<article class="map-panel"><div class="map-title"><strong>Southern Hemisphere</strong><span id="g-s-range">40–90°S · dayward meridian at top</span></div><div id="g-wrap-s" class="wrap"><canvas id="g-canvas-s"></canvas></div></article>
+</div>
+<div class="legend"><div class="legend-name">Aurora Probability (%)</div><div class="legend-body"><div class="bar-prob"></div><div class="ticks"><span>0</span><span>10</span><span>20</span><span>30</span><span>40</span><span>50+</span></div></div></div>
+<p class="note">북반구 지도는 Forecast Time의 태양 방향이 위쪽에 오도록 회전합니다. 따라서 북반구 지도에서 위쪽은 낮 방향, 아래쪽은 밤 방향입니다.</p>
+</section>
+
+<section class="section" id="mlt-section">
+<div class="section-head"><div><h2>OVATION Prime Energy Flux</h2><p>MLT–MLAT 자기좌표 기반 입자 강수 에너지 플럭스 · 12 MLT가 항상 위쪽</p></div><div id="mlt-status" class="section-status">대기 중</div></div>
+<div class="meta">
+<div class="card"><div class="label">Model Run (UTC)</div><div id="m-model" class="value">--</div></div>
+<div class="card"><div class="label">Observation (UTC)</div><div id="m-obs" class="value">--</div></div>
+<div class="card"><div class="label">Forecast (UTC)</div><div id="m-forecast" class="value">--</div></div>
+<div class="card"><div class="label">North HP</div><div id="m-hpn" class="value">-- GW</div></div>
+<div class="card"><div class="label">South HP</div><div id="m-hps" class="value">-- GW</div></div>
+<div class="card"><div class="label">Forecast Kp / Check</div><div id="m-kp" class="value">--</div></div>
+</div>
+<div class="controls">
+<div class="control"><label for="m-component">성분</label><select id="m-component"><option value="total" selected>Total flux</option><option value="diff">Diffuse electrons</option><option value="mono">Monoenergetic electrons</option><option value="wav">Wave/broadband electrons</option><option value="ions">Ions</option></select></div>
+<div class="control"><label for="m-max">컬러바 최대</label><input id="m-max" type="number" min="0.2" max="20" step="0.2" value="5"><span>erg cm⁻² s⁻¹</span></div>
+<div class="control"><label for="m-threshold">임계값</label><input id="m-threshold" type="range" min="0" max="2" step="0.02" value="0.04"><output id="m-threshold-out">0.04</output></div>
+<div class="control"><label for="m-sigma">Gaussian</label><input id="m-sigma" type="range" min="0" max="4" step="0.5" value="2"><output id="m-sigma-out">2</output></div>
+<div class="control"><label for="m-levels">Contour 수</label><input id="m-levels" type="range" min="10" max="100" step="5" value="60"><output id="m-levels-out">60</output></div>
+<div class="control"><label for="m-opacity">투명도</label><input id="m-opacity" type="range" min="20" max="100" step="5" value="100"><output id="m-opacity-out">100%</output></div>
+<button id="m-refresh">지금 업데이트</button>
+</div>
+<div class="maps">
+<article class="map-panel"><div class="map-title"><strong>Northern Magnetic Hemisphere</strong><span>50–90° MLAT · 12 MLT at top</span></div><div id="m-wrap-n" class="wrap"><canvas id="m-canvas-n"></canvas></div></article>
+<article class="map-panel"><div class="map-title"><strong>Southern Magnetic Hemisphere</strong><span>50–90° |MLAT| · 12 MLT at top</span></div><div id="m-wrap-s" class="wrap"><canvas id="m-canvas-s"></canvas></div></article>
+</div>
+<div class="legend"><div id="m-legend-name" class="legend-name">Total energy flux (erg cm⁻² s⁻¹)</div><div class="legend-body"><div class="bar-flux"></div><div id="m-ticks" class="ticks"></div></div></div>
+<p class="note">MLT 지도는 12 MLT(낮 방향)가 위쪽, 00 MLT(밤 방향)가 아래쪽입니다. MLT 경계는 주기적으로 이어서 contour seam을 최소화합니다.</p>
+</section>
+</main>
+<script>
+"use strict";
+const GEO_URL="https://services.swpc.noaa.gov/json/ovation_aurora_latest.json";
+const LAND_URL="https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/land-110m.json";
+const TXT_URL={n:"https://services.swpc.noaa.gov/text/ovation_latest_aurora_n.txt",s:"https://services.swpc.noaa.gov/text/ovation_latest_aurora_s.txt"};
+const state={geo:null,land:null,mltN:null,mltS:null,geoLoading:false,mltLoading:false};
+const $=id=>document.getElementById(id);
+function setGlobal(){const ok=!!state.geo&&!!state.mltN&&!!state.mltS;const dot=$("global-dot"),label=$("global-status");if(dot)dot.className="dot"+(ok?" good":"");if(label)label.textContent=ok?"두 데이터셋 모두 정상 업데이트됨":"데이터 업데이트 중...";}
+function parseDate(v){if(!v)return null;let d=new Date(v);if(Number.isNaN(d.getTime()))d=new Date(String(v).replace(" ","T")+"Z");return Number.isNaN(d.getTime())?null:d}
+function fmtKst(v){const d=parseDate(v);return d?new Intl.DateTimeFormat("ko-KR",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).format(d):"--"}
+function fmtNow(){return new Date().toLocaleString("ko-KR",{hour12:false})}
+function solarDeclination(date){const start=Date.UTC(date.getUTCFullYear(),0,0);const day=(date.getTime()-start)/86400000;return -23.44*Math.cos((2*Math.PI/365)*(day+10))*Math.PI/180}
+function subsolarLongitudeDeg(date){const h=date.getUTCHours()+date.getUTCMinutes()/60+date.getUTCSeconds()/3600;let lon=180-15*h;while(lon>180)lon-=360;while(lon<-180)lon+=360;return lon}
+function dayNightValue(latDeg,lonDeg,date){const dec=solarDeclination(date),sub=subsolarLongitudeDeg(date)*Math.PI/180,lat=latDeg*Math.PI/180,lon=lonDeg*Math.PI/180,H=lon-sub;return Math.sin(lat)*Math.sin(dec)+Math.cos(lat)*Math.cos(dec)*Math.cos(H)}
+function sizeCanvas(c,w){const css=Math.max(300,Math.floor(w.clientWidth)),d=Math.min(devicePixelRatio||1,2);c.width=css*d;c.height=css*d;return {W:c.width,H:c.height}}
+function kernel(s){if(s<=0)return[1];const r=Math.ceil(3*s),k=[];let sum=0;for(let i=-r;i<=r;i++){const v=Math.exp(-(i*i)/(2*s*s));k.push(v);sum+=v}return k.map(v=>v/sum)}
+function smooth2D(values,w,h,sigma,periodicX=false){if(sigma<=0)return values;const k=kernel(sigma),r=Math.floor(k.length/2),tmp=new Float32Array(values.length),out=new Float32Array(values.length);for(let y=0;y<h;y++)for(let x=0;x<w;x++){let z=0;for(let j=-r;j<=r;j++){let xx=x+j;if(periodicX){xx=((xx%w)+w)%w}else xx=Math.max(0,Math.min(w-1,xx));z+=values[y*w+xx]*k[j+r]}tmp[y*w+x]=z}for(let y=0;y<h;y++)for(let x=0;x<w;x++){let z=0;for(let j=-r;j<=r;j++){const yy=Math.max(0,Math.min(h-1,y+j));z+=tmp[yy*w+x]*k[j+r]}out[y*w+x]=z}return out}
+
+// Geographic panel
+function geoColor(v,a){const x=Math.max(0,Math.min(50,v)),st=[[0,0,0,0,0],[2,0,150,30,110],[8,0,255,0,170],[16,90,255,0,205],[25,210,255,0,225],[35,255,220,0,238],[42,255,130,0,246],[50,255,0,0,255]];for(let i=0;i<st.length-1;i++){const p=st[i],q=st[i+1];if(x>=p[0]&&x<=q[0]){const f=(x-p[0])/(q[0]-p[0]),m=(u,v)=>Math.round(u+(v-u)*f);return `rgba(${m(p[1],q[1])},${m(p[2],q[2])},${m(p[3],q[3])},${(m(p[4],q[4])/255)*a})`}}return `rgba(255,0,0,${a})`}
+function geoProjection(hem,W,H,latLimit,date){const sun=subsolarLongitudeDeg(date);const lambdaRotation=hem==="north"?180-sun:-sun;const rot=[lambdaRotation,hem==="north"?-90:90];return d3.geoStereographic().rotate(rot).clipAngle(90-latLimit+.15).precision(.2).fitExtent([[W*.055,H*.055],[W*.945,H*.945]],{type:"Polygon",coordinates:[d3.range(0,361,2).map(l=>[l,hem==="north"?latLimit:-latLimit])]})}
+function geoGrid(hem,latLimit){const w=360,h=181,v=new Float32Array(w*h);for(const row of state.geo.coordinates){let lon=+row[0],lat=+row[1],val=+row[2];if(lon>180)lon-=360;if(hem==="north"&&lat<latLimit)continue;if(hem==="south"&&lat>-latLimit)continue;let x=Math.round(lon);if(x<0)x+=360;x=((x%360)+360)%360;const y=Math.round(lat+90);if(y>=0&&y<h)v[y*w+x]=val}return {v,w,h}}
+
+function drawTerminatorLine(ctx,proj,W,H,hem,date){
+  const dec=solarDeclination(date);
+  const sub=subsolarLongitudeDeg(date)*Math.PI/180;
+  const sx=Math.cos(dec)*Math.cos(sub), sy=Math.cos(dec)*Math.sin(sub), sz=Math.sin(dec);
+  const k=Math.abs(sz)<0.999 ? [0,0,1] : [1,0,0];
+  let ux=k[1]*sz-k[2]*sy, uy=k[2]*sx-k[0]*sz, uz=k[0]*sy-k[1]*sx;
+  const un=Math.hypot(ux,uy,uz)||1; ux/=un; uy/=un; uz/=un;
+  let vx=sy*uz-sz*uy, vy=sz*ux-sx*uz, vz=sx*uy-sy*ux;
+  const vn=Math.hypot(vx,vy,vz)||1; vx/=vn; vy/=vn; vz/=vn;
+  const segments=[]; let seg=[];
+  for(let a=0;a<=360;a+=0.5){
+    const t=a*Math.PI/180;
+    const x=ux*Math.cos(t)+vx*Math.sin(t);
+    const y=uy*Math.cos(t)+vy*Math.sin(t);
+    const z=uz*Math.cos(t)+vz*Math.sin(t);
+    const lat=Math.asin(z)*180/Math.PI;
+    const lon=Math.atan2(y,x)*180/Math.PI;
+    if((hem==='north' && lat<0) || (hem==='south' && lat>0)){
+      if(seg.length>1) segments.push(seg);
+      seg=[];
+      continue;
+    }
+    const q=proj([lon,lat]);
+    if(!q){ if(seg.length>1) segments.push(seg); seg=[]; continue; }
+    if(seg.length){
+      const prev=seg[seg.length-1];
+      const dist=Math.hypot(q[0]-prev[0], q[1]-prev[1]);
+      if(dist>W*0.2){ if(seg.length>1) segments.push(seg); seg=[]; }
+    }
+    seg.push(q);
+  }
+  if(seg.length>1) segments.push(seg);
+  ctx.save();
+  const clipPath=d3.geoPath(proj,ctx);
+  ctx.beginPath();
+  clipPath({type:'Sphere'});
+  ctx.clip();
+  ctx.strokeStyle='rgba(255,255,255,0.96)';
+  ctx.lineWidth=Math.max(2.0,W/520);
+  ctx.shadowColor='rgba(255,255,255,0.35)';
+  ctx.shadowBlur=Math.max(2,W/250);
+  ctx.setLineDash([]);
+  for(const s of segments){
+    ctx.beginPath();
+    ctx.moveTo(s[0][0],s[0][1]);
+    for(let i=1;i<s.length;i++) ctx.lineTo(s[i][0],s[i][1]);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawGeoBase(ctx,proj,W,H,hem,latLimit,date){ctx.clearRect(0,0,W,H);const path=d3.geoPath(proj,ctx),sphere={type:"Sphere"};ctx.beginPath();path(sphere);ctx.fillStyle="#001287";ctx.fill();if($('g-night').checked){const latMin=hem==="north"?0:-90,latMax=hem==="north"?90:0;for(let lat=latMin;lat<latMax;lat+=2)for(let lon=-180;lon<180;lon+=3){const solar=dayNightValue(lat+1,lon+1.5,date);let alpha=solar<0?.78:solar<.18?.34*(1-solar/.18):0;if(alpha<=0)continue;const pts=[[lon,lat],[lon+3,lat],[lon+3,lat+2],[lon,lat+2]];ctx.beginPath();let ok=false;for(const z of pts){const p=proj(z);if(!p)continue;if(!ok){ctx.moveTo(p[0],p[1]);ok=true}else ctx.lineTo(p[0],p[1])}if(ok){ctx.closePath();ctx.fillStyle=`rgba(0,0,18,${alpha})`;ctx.fill()}}}
+const grat=d3.geoGraticule().extent([[-180,hem==="north"?latLimit:-90],[180,hem==="north"?90:-latLimit]]).step([30,10]);ctx.beginPath();path(grat());ctx.strokeStyle="#e1e1e166";ctx.lineWidth=Math.max(.6,W/1300);ctx.stroke();if(state.land){ctx.beginPath();path(state.land);ctx.fillStyle="#595d34e6";ctx.fill();ctx.beginPath();path(state.land);ctx.strokeStyle="#d7d7d7f2";ctx.lineWidth=Math.max(.7,W/1100);ctx.stroke()}ctx.beginPath();path(sphere);ctx.strokeStyle="#d2d2d299";ctx.lineWidth=Math.max(1,W/800);ctx.stroke()}
+function drawGeo(canvas,wrap,hem){if(!state.geo)return;const {W,H}=sizeCanvas(canvas,wrap),ctx=canvas.getContext("2d"),latLimit=+$('g-lat').value,date=parseDate(state.geo.forecast)||new Date(),proj=geoProjection(hem,W,H,latLimit,date);drawGeoBase(ctx,proj,W,H,hem,latLimit,date);const grid=geoGrid(hem,latLimit),vals=smooth2D(grid.v,grid.w,grid.h,+$('g-sigma').value,true),levels=d3.range(Math.floor(+$('g-threshold').value),51,1),contours=d3.contours().size([grid.w,grid.h]).smooth(true).thresholds(levels)(vals),alpha=+$('g-opacity').value/100;ctx.save();ctx.globalCompositeOperation="screen";for(const c of contours){ctx.beginPath();for(const poly of c.coordinates)for(const ring of poly){let started=false;for(const pt of ring){let lon=pt[0],lat=pt[1]-90;if(lon>180)lon-=360;const q=proj([lon,lat]);if(!q)continue;if(!started){ctx.moveTo(q[0],q[1]);started=true}else ctx.lineTo(q[0],q[1])}if(started)ctx.closePath()}ctx.fillStyle=geoColor(c.value,alpha);ctx.fill("evenodd")}ctx.restore();if(state.land){const path=d3.geoPath(proj,ctx);ctx.beginPath();path(state.land);ctx.strokeStyle="#f0f5f8dc";ctx.lineWidth=Math.max(.8,W/1050);ctx.stroke()}if($('g-night').checked)drawTerminatorLine(ctx,proj,W,H,hem,date)}
+function renderGeo(){if(!state.geo)return;const lim=+$('g-lat').value;$('g-n-range').textContent=`${lim}–90°N · dayward meridian at top`;$('g-s-range').textContent=`${lim}–90°S · dayward meridian at top`;drawGeo($('g-canvas-n'),$('g-wrap-n'),'north');drawGeo($('g-canvas-s'),$('g-wrap-s'),'south')}
+async function fetchRetry(url,type="text",n=3){let last;for(let i=1;i<=n;i++){try{const r=await fetch(url,{cache:"no-store"});if(!r.ok)throw new Error(`HTTP ${r.status}`);const t=await r.text();if(t.trim().length<100)throw new Error("빈 응답");return type==="json"?JSON.parse(t):t}catch(e){last=e;await new Promise(res=>setTimeout(res,500*i))}}throw last}
+async function loadGeo(){if(state.geoLoading)return;state.geoLoading=true;$('g-refresh').disabled=true;$('geo-status').textContent='NOAA JSON 수신 중...';try{const d=await fetchRetry(GEO_URL,'json');if(!Array.isArray(d.coordinates))throw new Error('coordinates 없음');state.geo={coordinates:d.coordinates,obs:d['Observation Time'],forecast:d['Forecast Time']};$('geo-obs').textContent=state.geo.obs;$('geo-forecast').textContent=state.geo.forecast;$('geo-kst').textContent=fmtKst(state.geo.forecast);$('geo-max').textContent=`${Math.max(...d.coordinates.map(r=>+r[2])).toFixed(1)} %`;const fd=parseDate(state.geo.forecast)||new Date(),sl=subsolarLongitudeDeg(fd);$('geo-sunlon').textContent=`${Math.abs(sl).toFixed(1)}°${sl>=0?'E':'W'}`;$('geo-check').textContent=fmtNow();$('geo-status').textContent='업데이트 완료';renderGeo();setGlobal()}catch(e){$('geo-status').textContent=`실패: ${e.message}`}finally{state.geoLoading=false;$('g-refresh').disabled=false}}
+
+// MLT panel
+function parseHeader(lines,key){const line=lines.find(x=>x.trim().startsWith(key));return line?line.split(":").slice(1).join(":").trim():"--"}
+function parseTxt(text){const lines=text.split(/\r?\n/),rows=[];for(const line of lines){const t=line.trim();if(!t||!/^[-+]?\d/.test(t))continue;const p=t.split(/\s+/).map(Number);if(p.length<6||p.some(v=>!Number.isFinite(v)))continue;rows.push({mlt:p[0],mlat:Math.abs(p[1]),diff:p[2],mono:p[3],wav:p[4],ions:p[5],total:p[2]+p[3]+p[4]+p[5]})}if(rows.length<100)throw new Error('유효 자료 부족');return {meta:{model:parseHeader(lines,'Model_Run Time'),obs:parseHeader(lines,'Observation Time'),forecast:parseHeader(lines,'Forecast Time'),hp:parseHeader(lines,'Hemispheric Power'),kp:parseHeader(lines,'Forecast Kp')},rows}}
+function uniq(a){return [...new Set(a.map(v=>+v.toFixed(4)))].sort((x,y)=>x-y)}
+function mGrid(ds,key){const mlts=uniq(ds.rows.map(r=>r.mlt)),lats=uniq(ds.rows.map(r=>r.mlat)),w=mlts.length,h=lats.length,v=new Float32Array(w*h),mi=new Map(mlts.map((x,i)=>[x,i])),li=new Map(lats.map((x,i)=>[x,i]));for(const r of ds.rows)v[li.get(+r.mlat.toFixed(4))*w+mi.get(+r.mlt.toFixed(4))]=r[key];return {v,w,h,mlts,lats}}
+function mColor(v,max,a){const x=Math.max(0,Math.min(1,v/max)),st=[[0,0,0,35],[.08,0,30,180],[.24,0,180,255],[.43,0,255,55],[.65,210,255,0],[.82,255,170,0],[1,255,0,0]];for(let i=0;i<st.length-1;i++){const p=st[i],q=st[i+1];if(x>=p[0]&&x<=q[0]){const f=(x-p[0])/(q[0]-p[0]),m=(u,v)=>Math.round(u+(v-u)*f);return `rgba(${m(p[1],q[1])},${m(p[2],q[2])},${m(p[3],q[3])},${a})`}}return `rgba(255,0,0,${a})`}
+function mPoint(mlt,mlat,cx,cy,R){const theta=((mlt-12)/24)*Math.PI*2-Math.PI/2,r=(90-mlat)/40*R;return [cx+r*Math.cos(theta),cy+r*Math.sin(theta)]}
+function drawMBase(ctx,W,H){ctx.clearRect(0,0,W,H);const cx=W/2,cy=H/2,R=Math.min(W,H)*.40;ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.fillStyle='#00104b';ctx.fill();ctx.strokeStyle='#dce8f0cc';ctx.lineWidth=Math.max(1,W/900);ctx.stroke();ctx.strokeStyle='#dce8f055';ctx.fillStyle='#dce8f0cc';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`${Math.max(11,W/72)}px Arial`;for(const lat of [50,60,70,80]){const r=(90-lat)/40*R;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();ctx.fillText(`${lat}°`,cx+Math.cos(-Math.PI/4)*r+18,cy+Math.sin(-Math.PI/4)*r)}ctx.font=`600 ${Math.max(17,W/43)}px Arial`;ctx.fillStyle='#f4f8ff';for(let h=0;h<24;h+=3){const t=((h-12)/24)*Math.PI*2-Math.PI/2;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+R*Math.cos(t),cy+R*Math.sin(t));ctx.strokeStyle='#dce8f055';ctx.stroke();ctx.fillText(`${String(h).padStart(2,'0')} MLT`,cx+(R+34)*Math.cos(t),cy+(R+34)*Math.sin(t))}return {cx,cy,R}}
+function tile3(v,w,h){const tw=w*3,out=new Float32Array(tw*h);for(let y=0;y<h;y++){const src=y*w,dst=y*tw;for(let t=0;t<3;t++)out.set(v.subarray(src,src+w),dst+t*w)}return {v:out,w:tw,h}}
+function interpLat(y,g){const gy=Math.max(0,Math.min(g.h-1,y)),y0=Math.floor(gy),y1=Math.min(y0+1,g.h-1),t=gy-y0;return g.lats[y0]*(1-t)+g.lats[y1]*t}
+function drawMRing(ctx,ring,g,b){if(!ring||ring.length<3)return;let mx=0;for(const p of ring)mx+=p[0];mx/=ring.length;if(mx<g.w||mx>=2*g.w)return;let started=false;for(const p of ring){const mlt=((p[0]-g.w)/g.w)*24,lat=interpLat(p[1],g),q=mPoint(mlt,lat,b.cx,b.cy,b.R);if(!started){ctx.moveTo(q[0],q[1]);started=true}else ctx.lineTo(q[0],q[1])}if(started)ctx.closePath()}
+function drawM(canvas,wrap,ds){const {W,H}=sizeCanvas(canvas,wrap),ctx=canvas.getContext('2d'),base=drawMBase(ctx,W,H),g=mGrid(ds,$('m-component').value),vals=smooth2D(g.v,g.w,g.h,+$('m-sigma').value,true),per=tile3(vals,g.w,g.h),max=+$('m-max').value,thr=+$('m-threshold').value,n=+$('m-levels').value,levels=d3.range(n).map(i=>thr+(max-thr)*i/Math.max(1,n-1)),cont=d3.contours().size([per.w,per.h]).smooth(true).thresholds(levels)(per.v),a=+$('m-opacity').value/100;ctx.save();ctx.beginPath();ctx.arc(base.cx,base.cy,base.R,0,Math.PI*2);ctx.clip();ctx.globalCompositeOperation='screen';for(const c of cont){ctx.beginPath();for(const poly of c.coordinates)for(const ring of poly)drawMRing(ctx,ring,g,base);ctx.fillStyle=mColor(c.value,max,a*.92);ctx.fill('evenodd')}ctx.restore();ctx.beginPath();ctx.arc(base.cx,base.cy,base.R,0,Math.PI*2);ctx.strokeStyle='#f2f5f7dd';ctx.lineWidth=Math.max(1,W/850);ctx.stroke()}
+function updateMLegend(){const names={total:'Total energy flux',diff:'Diffuse electron energy flux',mono:'Monoenergetic electron energy flux',wav:'Wave/broadband electron energy flux',ions:'Ion energy flux'};$('m-legend-name').textContent=`${names[$('m-component').value]} (erg cm⁻² s⁻¹)`;const m=+$('m-max').value;$('m-ticks').innerHTML='';for(let i=0;i<=5;i++){const s=document.createElement('span');s.textContent=(m*i/5).toFixed(m<2?2:1);$('m-ticks').appendChild(s)}}
+function renderM(){if(!state.mltN||!state.mltS)return;updateMLegend();drawM($('m-canvas-n'),$('m-wrap-n'),state.mltN);drawM($('m-canvas-s'),$('m-wrap-s'),state.mltS)}
+async function loadM(){if(state.mltLoading)return;state.mltLoading=true;$('m-refresh').disabled=true;$('mlt-status').textContent='NOAA TXT 수신 중...';try{const [n,s]=await Promise.all([fetchRetry(TXT_URL.n),fetchRetry(TXT_URL.s)]);state.mltN=parseTxt(n);state.mltS=parseTxt(s);$('m-model').textContent=state.mltN.meta.model;$('m-obs').textContent=state.mltN.meta.obs;$('m-forecast').textContent=state.mltN.meta.forecast;$('m-hpn').textContent=`${state.mltN.meta.hp} GW`;$('m-hps').textContent=`${state.mltS.meta.hp} GW`;$('m-kp').textContent=`Kp ${state.mltN.meta.kp} · ${fmtNow()}`;$('mlt-status').textContent='업데이트 완료';renderM();setGlobal()}catch(e){$('mlt-status').textContent=`실패: ${e.message}`}finally{state.mltLoading=false;$('m-refresh').disabled=false}}
+
+async function loadLand(){try{const r=await fetch(LAND_URL);const t=await r.json();state.land=topojson.feature(t,t.objects.land);renderGeo()}catch(e){console.error(e)}}
+for(const [id,out,suf,fn] of [['g-threshold','g-threshold-out','',renderGeo],['g-opacity','g-opacity-out','%',renderGeo],['g-lat','g-lat-out','°',()=>{$('g-lat-out').textContent=`±${$('g-lat').value}°`;renderGeo()}],['g-sigma','g-sigma-out','',renderGeo],['m-threshold','m-threshold-out','',renderM],['m-sigma','m-sigma-out','',renderM],['m-levels','m-levels-out','',renderM],['m-opacity','m-opacity-out','%',renderM]]){if(id==='g-lat'){$(id).addEventListener('input',fn)}else $(id).addEventListener('input',()=>{$(out).textContent=$(id).value+suf;fn()})}
+$('g-night').addEventListener('change',renderGeo);$('g-refresh').addEventListener('click',loadGeo);$('m-refresh').addEventListener('click',loadM);$('m-component').addEventListener('change',renderM);$('m-max').addEventListener('change',renderM);
+new ResizeObserver(()=>{renderGeo();renderM()}).observe(document.querySelector('.app'));
+loadLand();loadGeo();loadM();setInterval(loadGeo,5*60*1000);setInterval(loadM,5*60*1000);
+</script>
+</body>
+</html>
