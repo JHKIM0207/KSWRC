@@ -67,12 +67,12 @@ async function main() {
     const w = windByT.get(t), m = magByT.get(t);
     const point = {
       t,
-      speed: w ? Number(w.proton_speed) : null,
-      density: w ? Number(w.proton_density) : null,
-      bt: m ? Number(m.bt) : null,
-      bx: m ? Number(m.bx_gsm) : null,
-      by: m ? Number(m.by_gsm) : null,
-      bz: m ? Number(m.bz_gsm) : null
+      speed: w && Number(w.proton_speed) >= 100 && Number(w.proton_speed) <= 3000 ? Number(w.proton_speed) : null,
+      density: w && Number(w.proton_density) >= 0.05 && Number(w.proton_density) <= 500 ? Number(w.proton_density) : null,
+      bt: m && Number(m.bt) >= 0 && Number(m.bt) <= 300 ? Number(m.bt) : null,
+      bx: m && Math.abs(Number(m.bx_gsm)) <= 300 ? Number(m.bx_gsm) : null,
+      by: m && Math.abs(Number(m.by_gsm)) <= 300 ? Number(m.by_gsm) : null,
+      bz: m && Math.abs(Number(m.bz_gsm)) <= 300 ? Number(m.bz_gsm) : null
     };
     const day = dayKey(t);
     if (!byDay.has(day)) byDay.set(day, []);
