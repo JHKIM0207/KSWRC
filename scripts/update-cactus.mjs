@@ -13,7 +13,7 @@ function parseCatalog(text) {
   for (const raw of text.split('\n')) {
     const line = raw.trim();
     if (!line) continue;
-    if (/^#\s*Flow/i.test(line)) { inFlow = true; continue; }
+    if (/^#\s*Flow\s*\|/i.test(line)) { inFlow = true; continue; }
     if (inFlow || line.startsWith('#') || line.startsWith(':')) continue;
     const parts = line.split('|').map(s => s.trim());
     if (parts.length < 9 || !/^\d+$/.test(parts[0])) continue;
