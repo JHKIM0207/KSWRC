@@ -5,7 +5,7 @@ import path from 'node:path';
 
 const API_KEY = 'ELqmf5t53DLXh0h1K3aKiaTWamKenTg7RzP8pnd5';
 const DIR = path.join(process.cwd(), 'data', 'donki');
-const TYPES = ['CME', 'FLR', 'IPS'];
+const TYPES = ['FLR', 'IPS'];
 
 function dateRange(days) {
   const end = new Date(), start = new Date(end.getTime() - days * 86400000);
