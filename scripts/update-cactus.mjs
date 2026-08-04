@@ -32,14 +32,18 @@ function parseCatalog(text) {
 
 async function main() {
   await fs.mkdir(DIR, { recursive: true });
-  const r = await fetch(URL_, { cache: 'no-store' });
+  const r = await fetch(URL_, { cache: 'no-store', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SpaceWeatherDashboard/1.0)' } });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const text = await r.text();
   const all = parseCatalog(text);
+  if (all.length === 0) {
+    console.warn('Parsed 0 entries. First 500 chars of response:');
+    console.warn(text.slice(0, 500));
+  }
   const cutoff = Date.now() - KEEP_DAYS * 86400000;
   const recent = all.filter(e => e.t0 >= cutoff);
   await fs.writeFile(path.join(DIR, 'cmecat.json'), JSON.stringify(recent), 'utf8');
-  console.log(`Saved ${recent.length} CACTUS CME entries`);
+  console.log(`Saved ${recent.length} CACTUS CME entries (parsed ${all.length} total)`);
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
