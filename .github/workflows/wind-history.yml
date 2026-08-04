@@ -2,7 +2,7 @@ name: Update wind history
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -18,9 +18,10 @@ jobs:
           node-version: 22
       - run: node scripts/update-wind-history.mjs
       - run: node scripts/update-donki.mjs
+      - run: node scripts/update-cactus.mjs
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/wind-history data/donki
-          git diff --cached --quiet || git commit -m "Update wind history and DONKI data"
+          git add data/wind-history data/donki data/cactus
+          git diff --cached --quiet || git commit -m "Update wind history, DONKI, and CACTUS data"
           git push
