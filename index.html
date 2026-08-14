@@ -1437,8 +1437,86 @@ function buildReportSummary(){
 function combineReportText(author,reviewer,summary,notes){
   return `우주환경 리포트 (Space Weather Report)\n보고자: ${author||'-'}\n검토자: ${reviewer||'-'}\n\n${summary}\n\n${'='.repeat(44)}\n[보고자 작성 의견]\n${notes||'(내용 없음)'}`;
 }
-function reportHistory(){try{return JSON.parse(localStorage.getItem('swx-report-history')||'[]')}catch(e){return[]}}
-function saveReportHistory(list){try{localStorage.setItem('swx-report-history',JSON.stringify(list.slice(0,30)))}catch(e){}}
+// Reports live in the repository, not in this browser: data/reports/index.json holds
+// the entries and data/reports/<id>.txt holds each report as a plain text file, so
+// anyone can read them and they are the same on every machine. Writing needs a
+// GitHub token, which is asked for once in the editor window and kept only there.
+const REPORT_STORE={owner:'JHKIM0207',repo:'KSWRC',branch:'main',dir:'data/reports'};
+const REPORT_INDEX_URL=`./${REPORT_STORE.dir}/index.json`;
+let reportIndexCache=[],reportIndexLoaded=false;
+function reportHistory(){return reportIndexCache}
+async function loadReportIndex(){
+  try{
+    const r=await fetch(`${REPORT_INDEX_URL}?t=${Date.now()}`,{cache:'no-store'});
+    if(r.ok){
+      const j=await r.json();
+      if(Array.isArray(j))reportIndexCache=j.slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+    }else if(r.status!==404){
+      console.warn('report index HTTP',r.status);
+    }
+  }catch(e){console.warn('report index unavailable',e)}
+  reportIndexLoaded=true;
+  return reportIndexCache;
+}
+function reportToken(){try{return localStorage.getItem('swx-gh-token')||''}catch(e){return''}}
+function saveReportToken(v){try{v?localStorage.setItem('swx-gh-token',v):localStorage.removeItem('swx-gh-token')}catch(e){}}
+function b64(text){return btoa(String.fromCharCode(...new TextEncoder().encode(text)))}
+// Contents API needs the current blob sha to replace a file; 404 means it is new.
+async function ghSha(path,token){
+  const r=await fetch(`https://api.github.com/repos/${REPORT_STORE.owner}/${REPORT_STORE.repo}/contents/${path}?ref=${REPORT_STORE.branch}`,
+    {headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json'},cache:'no-store'});
+  if(r.status===404)return null;
+  if(!r.ok)throw new Error(`${path}: HTTP ${r.status}`);
+  return (await r.json()).sha;
+}
+async function ghPut(path,text,message,token){
+  const sha=await ghSha(path,token);
+  const r=await fetch(`https://api.github.com/repos/${REPORT_STORE.owner}/${REPORT_STORE.repo}/contents/${path}`,{
+    method:'PUT',
+    headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','Content-Type':'application/json'},
+    body:JSON.stringify({message,content:b64(text),branch:REPORT_STORE.branch,...(sha?{sha}:{})})
+  });
+  if(!r.ok)throw new Error(`${path}: HTTP ${r.status} ${(await r.text()).slice(0,200)}`);
+}
+async function ghDelete(path,message,token){
+  const sha=await ghSha(path,token);
+  if(!sha)return;
+  const r=await fetch(`https://api.github.com/repos/${REPORT_STORE.owner}/${REPORT_STORE.repo}/contents/${path}`,{
+    method:'DELETE',
+    headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','Content-Type':'application/json'},
+    body:JSON.stringify({message,sha,branch:REPORT_STORE.branch})
+  });
+  if(!r.ok)throw new Error(`${path}: HTTP ${r.status}`);
+}
+// Deleting from the dashboard: drop the entry, remove its text file, rewrite the index.
+async function deleteReportEntry(id){
+  const token=reportToken();
+  if(!token){alert('삭제에는 GitHub 토큰이 필요합니다. 리포트 작성 창에서 토큰을 먼저 등록해 주세요.');return}
+  const next=reportIndexCache.filter(x=>x.id!==id);
+  try{
+    await ghDelete(`${REPORT_STORE.dir}/${id}.txt`,`Delete report ${id}`,token);
+    await ghPut(`${REPORT_STORE.dir}/index.json`,JSON.stringify(next,null,2)+'\n',`Delete report ${id}`,token);
+    reportIndexCache=next;
+  }catch(e){alert('삭제 실패: '+e.message);return}
+  renderReportTabList();
+}
+function saveReportHistory(list){reportIndexCache=list}
+// The editor runs in its own window; it pings back here after a successful commit.
+// GitHub Pages serves the new index.json only after the Pages build finishes, so
+// the refresh is retried for a short while rather than assumed instant.
+window.addEventListener('message',e=>{
+  if(e.origin!==location.origin||e.data!=='swx-report-saved')return;
+  let tries=0;
+  const tick=()=>{loadReportIndex().then(()=>{renderReportTabList();if(++tries<10)setTimeout(tick,6000)})};
+  tick();
+});
+function openReportEditorWindow(existing){
+  // Hand the live summary to the editor window: it cannot recompute NOAA stats itself.
+  const payload={summary:buildReportSummary(),existing:existing||null};
+  try{localStorage.setItem('swx-report-draft',JSON.stringify(payload))}catch(e){}
+  const w=window.open('report-editor.html','swx-report-editor','width=1180,height=940');
+  if(!w)alert('팝업이 차단되었습니다. 이 사이트의 팝업을 허용해 주세요.');
+}
 function weekRangeFor(date){
   // Week runs Thursday -> Wednesday
   const d=new Date(date);d.setHours(0,0,0,0);
@@ -1504,7 +1582,7 @@ function renderWeekReportList(containerId,weekState,opts){
   box.querySelectorAll('[data-wl-open]').forEach(el=>el.addEventListener('click',e=>{if(e.target.closest('[data-wl-dl],[data-wl-del]'))return;const h=reportHistory().find(x=>x.id===el.dataset.wlOpen);if(h&&opts.onOpen)opts.onOpen(h)}));
   if(opts.showActions){
     box.querySelectorAll('[data-wl-dl]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();const h=reportHistory().find(x=>x.id===b.dataset.wlDl);if(h)downloadTextFile(h.text,`space-weather-report-${h.id}.txt`)}));
-    box.querySelectorAll('[data-wl-del]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();requireReportAuth(()=>{const id=b.dataset.wlDel;saveReportHistory(reportHistory().filter(x=>x.id!==id));renderReportTabList();if(opts.onDelete)opts.onDelete(id);rerender()})}));
+    box.querySelectorAll('[data-wl-del]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();requireReportAuth(()=>{const id=b.dataset.wlDel;if(!confirm('이 리포트를 저장소에서 삭제할까요?'))return;deleteReportEntry(id).then(()=>{if(opts.onDelete)opts.onDelete(id);rerender()})})}));
   }
 }
 function renderReportModal(existing){
@@ -1544,7 +1622,7 @@ function renderReportTabList(){
   box.querySelectorAll('[data-report-tab-dl]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();const h=reportHistory().find(x=>x.id===b.dataset.reportTabDl);if(h)downloadTextFile(h.text,`space-weather-report-${h.id}.txt`)}));
   if($('report-week-dl-all'))$('report-week-dl-all').onclick=()=>{const combined=history.map(h=>`===== ${h.createdAt} · 보고자: ${h.author||'-'} · 검토자: ${h.reviewer||'-'} =====\n\n${h.text}`).join('\n\n\n');downloadTextFile(combined,`space-weather-reports-${fmtYmd(start)}_${fmtYmd(end)}.txt`)};
 }
-function openReportModal(existing){renderReportModal(existing);$('report-modal').classList.add('open')}
+function openReportModal(existing){openReportEditorWindow(existing)}
 const REPORT_LOGIN={id:'sos_report',pw:'dnwnghksrud'};
 function isReportAuthed(){try{return sessionStorage.getItem('swx-report-auth')==='1'}catch(e){return false}}
 function updateReportAuthUI(){const b=$('report-logout-btn');if(b)b.style.display=isReportAuthed()?'inline-block':'none'}
@@ -3415,9 +3493,9 @@ function goToView(view){const btn=document.querySelector(`.nav button[data-view=
 $('home-title').addEventListener('click',()=>goToView('overview'));
 (()=>{const btn=$('links-btn'),dd=$('links-dropdown');if(!btn||!dd)return;btn.addEventListener('click',e=>{e.stopPropagation();dd.classList.toggle('open')});document.addEventListener('click',()=>dd.classList.remove('open'));})();
 document.querySelectorAll('.details-btn').forEach(b=>b.addEventListener('click',()=>goToView(b.dataset.goto)));
-for(const b of document.querySelectorAll('.nav button[data-view]'))b.addEventListener('click',()=>{document.querySelectorAll('.nav button[data-view]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===b.dataset.view));requestAnimationFrame(render);if(b.dataset.view==='solar'&&selectedRegion)requestAnimationFrame(()=>{drawSolarDisk();showRegionDetail(selectedRegion)});if(b.dataset.view==='imagery')loadSolarImages();if(b.dataset.view==='ionosphere'){loadIonosphere();requestAnimationFrame(renderIonosphere)}});$('refresh').addEventListener('click',loadAll);$('reload-solar-images').addEventListener('click',loadSolarImages);$('reload-solar-cycle').addEventListener('click',loadSolarCycleImage);$('reload-ionosphere').addEventListener('click',loadIonosphere);$('solar-cycle-image').addEventListener('click',()=>{if(!$('solar-cycle-image').src)return;$('modal-img').src=$('solar-cycle-image').src;$('modal-img').alt='NOAA Experimental Solar Cycle 25 Prediction';$('modal').classList.add('open')});$('enlil-play').addEventListener('click',toggleEnlil);$('enlil-prev').addEventListener('click',()=>stepEnlil(-1));$('enlil-next').addEventListener('click',()=>stepEnlil(1));$('enlil-slider').addEventListener('input',e=>{stopEnlil();state.enlilIndex=Number(e.target.value)||0;drawEnlil()});$('enlil-image').addEventListener('click',()=>{if(!$('enlil-image').src)return;$('modal-img').src=$('enlil-image').src;$('modal-img').alt='NOAA WSA-ENLIL heliospheric forecast';$('modal').classList.add('open')});$('drap-play').addEventListener('click',toggleDrap);$('drap-prev').addEventListener('click',()=>stepDrap(-1));$('drap-next').addEventListener('click',()=>stepDrap(1));$('drap-slider').addEventListener('input',e=>{stopDrap();state.drapIndex=Number(e.target.value)||0;drawDrap()});$('drap-image').addEventListener('click',()=>{if(!$('drap-image').src)return;$('modal-img').src=$('drap-image').src;$('modal-img').alt='NOAA D-RAP global HF absorption';$('modal').classList.add('open')});document.querySelectorAll('.iono-subtabs').forEach(group=>{const container=group.parentElement;group.querySelectorAll('.iono-subtab').forEach(b=>b.addEventListener('click',()=>{group.querySelectorAll('.iono-subtab').forEach(x=>x.classList.toggle('active',x===b));container.querySelectorAll('.iono-subview').forEach(v=>v.classList.toggle('active',v.id===`iono-view-${b.dataset.ionoView}`));if(b.dataset.ionoView==='drap')drawDrap();if(b.dataset.ionoView==='magnetopause')renderMagnetopause();if(b.dataset.ionoView==='magnetopause3d')initMp3D()}))});$('open-aurora').addEventListener('click',()=>window.open('ovation_combined_dashboard.html','_blank'));for(const card of document.querySelectorAll('.image-card'))card.addEventListener('click',()=>{$('modal-img').src=card.querySelector('img').src;$('modal-img').alt=card.dataset.label;$('modal').classList.add('open')});$('modal-close').addEventListener('click',()=>$('modal').classList.remove('open'));$('cactus-modal-close').addEventListener('click',()=>$('cactus-modal').classList.remove('open'));$('cactus-modal').addEventListener('click',e=>{if(e.target===$('cactus-modal'))$('cactus-modal').classList.remove('open')});$('report-open-btn').addEventListener('click',()=>requireReportAuth(()=>openReportModal()));$('report-modal-close').addEventListener('click',()=>$('report-modal').classList.remove('open'));$('report-view-modal-close').addEventListener('click',()=>$('report-view-modal').classList.remove('open'));$('report-view-modal').addEventListener('click',e=>{if(e.target===$('report-view-modal'))$('report-view-modal').classList.remove('open')});$('report-modal').addEventListener('click',e=>{if(e.target===$('report-modal'))$('report-modal').classList.remove('open')});renderReportTabList();renderReportCalendar();$('modal').addEventListener('click',e=>{if(e.target===$('modal'))$('modal').classList.remove('open')});bindInteractiveCanvas('c-kp','overview',render);bindInteractiveCanvas('c-overview-dst','overview',render);bindInteractiveCanvas('c-overview-wind','overview',render);bindInteractiveCanvas('c-overview-bz','overview',render);bindInteractiveCanvas('c-overview-xray','overview',render);bindInteractiveCanvas('c-overview-proton','overview',render);bindInteractiveCanvas('c-speed','wind',renderWindCharts);bindInteractiveCanvas('c-density','wind',renderWindCharts);bindInteractiveCanvas('c-bt','wind',renderWindCharts);bindInteractiveCanvas('c-bx','wind',renderWindCharts);bindInteractiveCanvas('c-by','wind',renderWindCharts);bindInteractiveCanvas('c-bz','wind',renderWindCharts);bindInteractiveCanvas('c-kp2','geomag',renderGeomagCharts);bindInteractiveCanvas('c-hp30','geomag',renderGeomagCharts);bindInteractiveCanvas('c-dst','geomag',renderGeomagCharts);bindInteractiveCanvas('c-xray','solar',render);bindInteractiveCanvas('c-proton','radiation',render);bindInteractiveCanvas('c-electron','radiation',render);for(const id of ['iono-resolution','iono-smoothing','iono-opacity','iono-contours','iono-contour-alpha','iono-show-labels','iono-show-map','iono-show-grid','iono-show-points']){const el=$(id);if(el)el.addEventListener('input',()=>{if(id==='iono-smoothing')$('iono-smoothing-value').textContent=el.value;if(id==='iono-opacity')$('iono-opacity-value').textContent=el.value+'%';if(id==='iono-contour-alpha')$('iono-contour-alpha-value').textContent=el.value+'%';renderIonosphere()})}
+for(const b of document.querySelectorAll('.nav button[data-view]'))b.addEventListener('click',()=>{document.querySelectorAll('.nav button[data-view]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===b.dataset.view));requestAnimationFrame(render);if(b.dataset.view==='solar'&&selectedRegion)requestAnimationFrame(()=>{drawSolarDisk();showRegionDetail(selectedRegion)});if(b.dataset.view==='imagery')loadSolarImages();if(b.dataset.view==='ionosphere'){loadIonosphere();requestAnimationFrame(renderIonosphere)}});$('refresh').addEventListener('click',loadAll);$('reload-solar-images').addEventListener('click',loadSolarImages);$('reload-solar-cycle').addEventListener('click',loadSolarCycleImage);$('reload-ionosphere').addEventListener('click',loadIonosphere);$('solar-cycle-image').addEventListener('click',()=>{if(!$('solar-cycle-image').src)return;$('modal-img').src=$('solar-cycle-image').src;$('modal-img').alt='NOAA Experimental Solar Cycle 25 Prediction';$('modal').classList.add('open')});$('enlil-play').addEventListener('click',toggleEnlil);$('enlil-prev').addEventListener('click',()=>stepEnlil(-1));$('enlil-next').addEventListener('click',()=>stepEnlil(1));$('enlil-slider').addEventListener('input',e=>{stopEnlil();state.enlilIndex=Number(e.target.value)||0;drawEnlil()});$('enlil-image').addEventListener('click',()=>{if(!$('enlil-image').src)return;$('modal-img').src=$('enlil-image').src;$('modal-img').alt='NOAA WSA-ENLIL heliospheric forecast';$('modal').classList.add('open')});$('drap-play').addEventListener('click',toggleDrap);$('drap-prev').addEventListener('click',()=>stepDrap(-1));$('drap-next').addEventListener('click',()=>stepDrap(1));$('drap-slider').addEventListener('input',e=>{stopDrap();state.drapIndex=Number(e.target.value)||0;drawDrap()});$('drap-image').addEventListener('click',()=>{if(!$('drap-image').src)return;$('modal-img').src=$('drap-image').src;$('modal-img').alt='NOAA D-RAP global HF absorption';$('modal').classList.add('open')});document.querySelectorAll('.iono-subtabs').forEach(group=>{const container=group.parentElement;group.querySelectorAll('.iono-subtab').forEach(b=>b.addEventListener('click',()=>{group.querySelectorAll('.iono-subtab').forEach(x=>x.classList.toggle('active',x===b));container.querySelectorAll('.iono-subview').forEach(v=>v.classList.toggle('active',v.id===`iono-view-${b.dataset.ionoView}`));if(b.dataset.ionoView==='drap')drawDrap();if(b.dataset.ionoView==='magnetopause')renderMagnetopause();if(b.dataset.ionoView==='magnetopause3d')initMp3D()}))});$('open-aurora').addEventListener('click',()=>window.open('ovation_combined_dashboard.html','_blank'));for(const card of document.querySelectorAll('.image-card'))card.addEventListener('click',()=>{$('modal-img').src=card.querySelector('img').src;$('modal-img').alt=card.dataset.label;$('modal').classList.add('open')});$('modal-close').addEventListener('click',()=>$('modal').classList.remove('open'));$('cactus-modal-close').addEventListener('click',()=>$('cactus-modal').classList.remove('open'));$('cactus-modal').addEventListener('click',e=>{if(e.target===$('cactus-modal'))$('cactus-modal').classList.remove('open')});$('report-open-btn').addEventListener('click',()=>requireReportAuth(()=>openReportEditorWindow()));$('report-modal-close').addEventListener('click',()=>$('report-modal').classList.remove('open'));$('report-view-modal-close').addEventListener('click',()=>$('report-view-modal').classList.remove('open'));$('report-view-modal').addEventListener('click',e=>{if(e.target===$('report-view-modal'))$('report-view-modal').classList.remove('open')});$('report-modal').addEventListener('click',e=>{if(e.target===$('report-modal'))$('report-modal').classList.remove('open')});renderReportTabList();renderReportCalendar();$('modal').addEventListener('click',e=>{if(e.target===$('modal'))$('modal').classList.remove('open')});bindInteractiveCanvas('c-kp','overview',render);bindInteractiveCanvas('c-overview-dst','overview',render);bindInteractiveCanvas('c-overview-wind','overview',render);bindInteractiveCanvas('c-overview-bz','overview',render);bindInteractiveCanvas('c-overview-xray','overview',render);bindInteractiveCanvas('c-overview-proton','overview',render);bindInteractiveCanvas('c-speed','wind',renderWindCharts);bindInteractiveCanvas('c-density','wind',renderWindCharts);bindInteractiveCanvas('c-bt','wind',renderWindCharts);bindInteractiveCanvas('c-bx','wind',renderWindCharts);bindInteractiveCanvas('c-by','wind',renderWindCharts);bindInteractiveCanvas('c-bz','wind',renderWindCharts);bindInteractiveCanvas('c-kp2','geomag',renderGeomagCharts);bindInteractiveCanvas('c-hp30','geomag',renderGeomagCharts);bindInteractiveCanvas('c-dst','geomag',renderGeomagCharts);bindInteractiveCanvas('c-xray','solar',render);bindInteractiveCanvas('c-proton','radiation',render);bindInteractiveCanvas('c-electron','radiation',render);for(const id of ['iono-resolution','iono-smoothing','iono-opacity','iono-contours','iono-contour-alpha','iono-show-labels','iono-show-map','iono-show-grid','iono-show-points']){const el=$(id);if(el)el.addEventListener('input',()=>{if(id==='iono-smoothing')$('iono-smoothing-value').textContent=el.value;if(id==='iono-opacity')$('iono-opacity-value').textContent=el.value+'%';if(id==='iono-contour-alpha')$('iono-contour-alpha-value').textContent=el.value+'%';renderIonosphere()})}
 window.addEventListener('topojsonready',()=>{ionoLoadWorldMap(true).then(()=>{if(ionoDataset)renderIonosphere()}).catch(()=>{})});
-new ResizeObserver(()=>{if(state.data.kp)render();if(ionoDataset&&$('ionosphere').classList.contains('active'))renderIonosphere()}).observe(document.querySelector('.app'));loadSolarImages();loadSolarCycleImage();loadIonosphere();loadAll();setInterval(loadAll,5*60*1000);setInterval(loadSolarImages,10*60*1000);setInterval(loadSolarCycleImage,24*60*60*1000);setInterval(loadIonosphere,10*60*1000);
+new ResizeObserver(()=>{if(state.data.kp)render();if(ionoDataset&&$('ionosphere').classList.contains('active'))renderIonosphere()}).observe(document.querySelector('.app'));loadReportIndex().then(()=>renderReportTabList());loadSolarImages();loadSolarCycleImage();loadIonosphere();loadAll();setInterval(loadAll,5*60*1000);setInterval(loadSolarImages,10*60*1000);setInterval(loadSolarCycleImage,24*60*60*1000);setInterval(loadIonosphere,10*60*1000);
 
 async function loadSolarProbabilities(){
   const status=document.getElementById('solar-probabilities-status');

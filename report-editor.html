@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>우주환경 리포트 작성</title>
+<style>
+:root{--bg:#080f1a;--panel:rgba(9,17,29,.76);--border:#1d2b3f;--text:#e8f0fa;--muted:#8fa6bb;--accent:#6dd6ff}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",sans-serif;padding:22px;line-height:1.55}
+.wrap{max-width:1000px;margin:auto;display:flex;flex-direction:column;gap:16px}
+h1{font-size:21px;letter-spacing:-.2px}
+.sub{color:var(--muted);font-size:13px;margin-top:3px}
+.card{border:1px solid var(--border);border-radius:14px;background:var(--panel);padding:16px}
+label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+input,textarea{width:100%;background:#0d1826;border:1px solid var(--border);border-radius:9px;color:var(--text);
+  padding:10px 12px;font-size:14px;font-family:inherit;line-height:1.6}
+textarea{resize:vertical}
+textarea.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.5}
+input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+.row{display:flex;gap:14px;flex-wrap:wrap}
+.row>div{flex:1;min-width:200px}
+.btn{background:#132234;border:1px solid var(--border);border-radius:9px;color:var(--text);
+  padding:10px 18px;font-size:14px;font-family:inherit;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:#14405c;border-color:#2b6d94}
+.btn:disabled{opacity:.5;cursor:default}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.status{font-size:13px;color:var(--muted);min-height:19px}
+.status.err{color:#ff8b7a}
+.status.ok{color:#7ee7b7}
+.tokenbar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.tokenbar>div{flex:1;min-width:260px}
+.note{font-size:12.5px;color:var(--muted)}
+a{color:var(--accent)}a:hover{color:#a9e7ff}
+</style>
+</head><body>
+<div class="wrap">
+  <div>
+    <h1>우주환경 리포트 작성</h1>
+    <p class="sub">저장하면 저장소의 <code>data/reports/</code> 에 텍스트 파일로 커밋되어 누구나 열람할 수 있습니다.</p>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div><label for="author">보고자</label><input id="author" autocomplete="off"></div>
+      <div><label for="reviewer">검토자</label><input id="reviewer" autocomplete="off"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label for="summary">자동 수집 요약 <span class="note">— 필요한 부분은 직접 수정하세요</span></label>
+    <textarea id="summary" class="mono" rows="20"></textarea>
+  </div>
+
+  <div class="card">
+    <label for="notes">보고자 작성 의견</label>
+    <textarea id="notes" rows="8" placeholder="관측 해석, 예상 영향, 조치 사항 등"></textarea>
+  </div>
+
+  <div class="card">
+    <div class="tokenbar">
+      <div>
+        <label for="token">GitHub 토큰</label>
+        <input id="token" type="password" placeholder="ghp_… 또는 github_pat_…" autocomplete="off">
+      </div>
+      <button type="button" class="btn" id="token-save">토큰 저장</button>
+      <button type="button" class="btn" id="token-clear">토큰 삭제</button>
+    </div>
+    <p class="note" style="margin-top:10px">
+      이 브라우저에만 저장되며 저장소에는 올라가지 않습니다. Fine-grained token · 대상 저장소 KSWRC · 권한 <strong>Contents: Read and write</strong>.
+    </p>
+  </div>
+
+  <div class="card actions">
+    <button type="button" class="btn primary" id="save">저장소에 저장</button>
+    <button type="button" class="btn" id="download">.txt 다운로드</button>
+    <button type="button" class="btn" id="close">닫기</button>
+    <span class="status" id="status"></span>
+  </div>
+</div>
+
+<script>
+"use strict";
+const STORE={owner:'JHKIM0207',repo:'KSWRC',branch:'main',dir:'data/reports'};
+const $=id=>document.getElementById(id);
+const setStatus=(msg,kind='')=>{const s=$('status');s.textContent=msg;s.className='status'+(kind?' '+kind:'')};
+
+// The dashboard hands over the live summary through localStorage, then this window
+// owns the draft. Read it once and clear it so a stale draft never resurfaces.
+let existing=null;
+(()=>{
+  let payload=null;
+  try{
+    const raw=localStorage.getItem('swx-report-draft');
+    if(raw)payload=JSON.parse(raw);
+    localStorage.removeItem('swx-report-draft');
+  }catch(e){}
+  existing=payload&&payload.existing?payload.existing:null;
+  $('summary').value=existing?(existing.summary||existing.text||''):(payload&&payload.summary?payload.summary:'');
+  if(existing){
+    $('author').value=existing.author||'';
+    $('reviewer').value=existing.reviewer||'';
+    $('notes').value=existing.notes||'';
+    setStatus('기존 리포트를 수정 중입니다 (' + (existing.createdAt||existing.id) + ')');
+  }
+  try{$('token').value=localStorage.getItem('swx-gh-token')||''}catch(e){}
+})();
+
+$('token-save').onclick=()=>{
+  const v=$('token').value.trim();
+  try{v?localStorage.setItem('swx-gh-token',v):localStorage.removeItem('swx-gh-token')}catch(e){}
+  setStatus(v?'토큰을 저장했습니다.':'토큰을 삭제했습니다.','ok');
+};
+$('token-clear').onclick=()=>{
+  $('token').value='';
+  try{localStorage.removeItem('swx-gh-token')}catch(e){}
+  setStatus('토큰을 삭제했습니다.','ok');
+};
+
+function combineReportText(author,reviewer,summary,notes){
+  return `우주환경 리포트 (Space Weather Report)\n보고자: ${author||'-'}\n검토자: ${reviewer||'-'}\n\n${summary}\n\n${'='.repeat(44)}\n[보고자 작성 의견]\n${notes||'(내용 없음)'}`;
+}
+function utcStamp(d){
+  const p=n=>String(n).padStart(2,'0');
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
+}
+function b64(text){return btoa(String.fromCharCode(...new TextEncoder().encode(text)))}
+
+async function ghSha(path,token){
+  const r=await fetch(`https://api.github.com/repos/${STORE.owner}/${STORE.repo}/contents/${path}?ref=${STORE.branch}`,
+    {headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json'},cache:'no-store'});
+  if(r.status===404)return null;
+  if(!r.ok)throw new Error(`${path} 조회 실패 (HTTP ${r.status})`);
+  return (await r.json()).sha;
+}
+async function ghPut(path,text,message,token){
+  const sha=await ghSha(path,token);
+  const r=await fetch(`https://api.github.com/repos/${STORE.owner}/${STORE.repo}/contents/${path}`,{
+    method:'PUT',
+    headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','Content-Type':'application/json'},
+    body:JSON.stringify({message,content:b64(text),branch:STORE.branch,...(sha?{sha}:{})})
+  });
+  if(!r.ok){
+    const body=(await r.text()).slice(0,300);
+    if(r.status===401)throw new Error('토큰이 유효하지 않습니다 (401). 토큰을 다시 발급해 주세요.');
+    if(r.status===403)throw new Error('권한이 없습니다 (403). Contents: Read and write 권한을 확인해 주세요.');
+    if(r.status===409)throw new Error('다른 저장과 충돌했습니다 (409). 잠시 후 다시 시도해 주세요.');
+    throw new Error(`${path} 저장 실패 (HTTP ${r.status}) ${body}`);
+  }
+}
+// The index is the list the dashboard reads. Re-read it right before writing so a
+// report saved elsewhere in the meantime is not dropped.
+async function loadIndex(token){
+  const r=await fetch(`https://api.github.com/repos/${STORE.owner}/${STORE.repo}/contents/${STORE.dir}/index.json?ref=${STORE.branch}`,
+    {headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github.raw'},cache:'no-store'});
+  if(r.status===404)return [];
+  if(!r.ok)throw new Error(`목록 조회 실패 (HTTP ${r.status})`);
+  try{const j=JSON.parse(await r.text());return Array.isArray(j)?j:[]}catch(e){return []}
+}
+
+function currentEntry(){
+  const author=$('author').value.trim(),reviewer=$('reviewer').value.trim();
+  const summary=$('summary').value,notes=$('notes').value;
+  const now=new Date();
+  return {
+    id:existing?existing.id:String(now.getTime()),
+    createdAt:existing?existing.createdAt:utcStamp(now),
+    updatedAt:utcStamp(now),
+    author,reviewer,summary,notes,
+    text:combineReportText(author,reviewer,summary,notes)
+  };
+}
+
+$('download').onclick=()=>{
+  const e=currentEntry();
+  const blob=new Blob([e.text],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob);
+  const a=document.createElement('a');document.body.appendChild(a);
+  a.href=url;a.download=`space-weather-report-${e.id}.txt`;a.rel='noopener';a.click();
+  setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},2000);
+};
+
+$('save').onclick=async()=>{
+  const token=$('token').value.trim();
+  if(!token){setStatus('먼저 GitHub 토큰을 입력해 주세요.','err');$('token').focus();return}
+  const entry=currentEntry();
+  if(!entry.author){setStatus('보고자를 입력해 주세요.','err');$('author').focus();return}
+  if(!entry.summary.trim()){setStatus('요약 내용이 비어 있습니다.','err');$('summary').focus();return}
+
+  $('save').disabled=true;
+  setStatus('저장 중…');
+  try{
+    try{localStorage.setItem('swx-gh-token',token)}catch(e){}
+    const list=await loadIndex(token);
+    const next=[entry,...list.filter(x=>x.id!==entry.id)]
+      .sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+    const msg=`${existing?'Update':'Add'} space weather report ${entry.id}`;
+    await ghPut(`${STORE.dir}/${entry.id}.txt`,entry.text+'\n',msg,token);
+    await ghPut(`${STORE.dir}/index.json`,JSON.stringify(next,null,2)+'\n',msg,token);
+    existing=entry;
+    setStatus('저장했습니다. 사이트 목록에는 GitHub Pages 배포가 끝난 뒤(보통 1–2분) 나타납니다.','ok');
+    try{if(window.opener&&!window.opener.closed)window.opener.postMessage('swx-report-saved',location.origin)}catch(e){}
+  }catch(e){
+    setStatus(e.message||String(e),'err');
+  }finally{
+    $('save').disabled=false;
+  }
+};
+
+$('close').onclick=()=>window.close();
+</script>
+</body></html>
