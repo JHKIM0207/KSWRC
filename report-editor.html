@@ -7,16 +7,17 @@
 :root{--bg:#080f1a;--panel:rgba(9,17,29,.76);--border:#1d2b3f;--text:#e8f0fa;--muted:#8fa6bb;--accent:#6dd6ff}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",sans-serif;padding:22px;line-height:1.55}
-.wrap{max-width:1000px;margin:auto;display:flex;flex-direction:column;gap:16px}
+.wrap{max-width:1360px;margin:auto;display:flex;flex-direction:column;gap:16px}
 h1{font-size:21px;letter-spacing:-.2px}
 .sub{color:var(--muted);font-size:13px;margin-top:3px}
 .card{border:1px solid var(--border);border-radius:14px;background:var(--panel);padding:16px}
 label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
-input,textarea{width:100%;background:#0d1826;border:1px solid var(--border);border-radius:9px;color:var(--text);
-  padding:10px 12px;font-size:14px;font-family:inherit;line-height:1.6}
+input,textarea{width:100%;background:#fff;border:1px solid #c4d0dd;border-radius:9px;color:#121a24;
+  padding:11px 13px;font-size:14px;font-family:inherit;line-height:1.6}
+input::placeholder,textarea::placeholder{color:#8794a3}
 textarea{resize:vertical}
-textarea.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.5}
-input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+textarea.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.55}
+input:focus,textarea:focus{outline:none;border-color:#2b8fc4;box-shadow:0 0 0 3px rgba(43,143,196,.22)}
 .row{display:flex;gap:14px;flex-wrap:wrap}
 .row>div{flex:1;min-width:200px}
 .btn{background:#132234;border:1px solid var(--border);border-radius:9px;color:var(--text);
@@ -49,12 +50,12 @@ a{color:var(--accent)}a:hover{color:#a9e7ff}
 
   <div class="card">
     <label for="summary">자동 수집 요약 <span class="note">— 필요한 부분은 직접 수정하세요</span></label>
-    <textarea id="summary" class="mono" rows="20"></textarea>
+    <textarea id="summary" class="mono" rows="26"></textarea>
   </div>
 
   <div class="card">
     <label for="notes">보고자 작성 의견</label>
-    <textarea id="notes" rows="8" placeholder="관측 해석, 예상 영향, 조치 사항 등"></textarea>
+    <textarea id="notes" rows="10" placeholder="관측 해석, 예상 영향, 조치 사항 등"></textarea>
   </div>
 
   <div class="card">

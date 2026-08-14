@@ -1514,7 +1514,10 @@ function openReportEditorWindow(existing){
   // Hand the live summary to the editor window: it cannot recompute NOAA stats itself.
   const payload={summary:buildReportSummary(),existing:existing||null};
   try{localStorage.setItem('swx-report-draft',JSON.stringify(payload))}catch(e){}
-  const w=window.open('report-editor.html','swx-report-editor','width=1180,height=940');
+  const W=Math.min(1500,Math.max(1100,Math.round(screen.availWidth*0.9)));
+  const H=Math.min(1200,Math.max(820,Math.round(screen.availHeight*0.92)));
+  const L=Math.max(0,Math.round((screen.availWidth-W)/2)),T=Math.max(0,Math.round((screen.availHeight-H)/2));
+  const w=window.open('report-editor.html','swx-report-editor',`width=${W},height=${H},left=${L},top=${T}`);
   if(!w)alert('팝업이 차단되었습니다. 이 사이트의 팝업을 허용해 주세요.');
 }
 function weekRangeFor(date){
