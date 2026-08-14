@@ -1484,6 +1484,80 @@ window.swxBuildSnapshot=function(){
     images:(()=>{const o={};document.querySelectorAll('.image-card img').forEach(img=>{if(img.dataset.key||img.alt)o[img.dataset.key||img.alt]=img.src});return o})()
   };
 };
+// Panels that cannot be archived: images, model frames and the aurora page are
+// fetched live from NOAA/NASA, which keep only the latest products. During replay
+// they would silently show today's data next to past measurements, so they are
+// disabled and replaced by a link to the official archive.
+const SWX_REPLAY_MASKS=[
+  {sel:'#solar-disk-image',scope:'section',label:'Active Region on Solar Disk',
+   href:'https://sdo.gsfc.nasa.gov/data/aiahmi/'},
+  {sel:'#v-enlil',label:'WSA-ENLIL 모델',
+   href:'https://www.ncei.noaa.gov/cloud-access/space-weather-portal/overview?program=SWPC-Models&inst=ENLIL'},
+  {sel:'#iono-view-tec',label:'Global Ionosphere (GloTEC)',
+   href:'https://services.swpc.noaa.gov/products/glotec/geojson_2d_urt/'},
+  {sel:'#iono-view-drap',label:'D-RAP 모델',
+   // The NCEI download form is date-scoped; point it at the replayed day.
+   href:'https://www.ncei.noaa.gov/cloud-access/space-weather-portal/download?sat=SWPC-Models&inst=DRAP&products=SWX_DRAP20',
+   dateScoped:true},
+  {sel:'#imagery > section',label:'Latest Solar Images',
+   href:'https://sdo.gsfc.nasa.gov/data/aiahmi/',
+   href2:'https://www.ncei.noaa.gov/products/goes-r-solar-ultraviolet-imager-suvi',
+   href2Label:'GOES/SUVI 아카이브 (NOAA NCEI)',hrefLabel:'SDO AIA/HMI 아카이브 (NASA)'},
+  {sel:'#aurora .iframe-shell',label:'OVATION Aurora',
+   href:'https://services.swpc.noaa.gov/products/ovation-aurora-latest.json'}
+];
+function swxMaskNotice(m){
+  const box=document.createElement('div');
+  box.className='swx-replay-mask';
+  box.style.cssText='border:1px dashed #7a5a24;border-radius:14px;background:rgba(60,42,18,.34);'+
+    'padding:26px 24px;display:flex;flex-direction:column;gap:9px;align-items:flex-start;margin:4px 0';
+  const h=document.createElement('div');
+  h.style.cssText='font-size:15px;font-weight:700;color:#ffd36b';
+  h.textContent=m.label+' — 과거 시점 재생 중에는 표시되지 않습니다';
+  const p=document.createElement('p');
+  p.style.cssText='font-size:13.5px;color:var(--muted);max-width:760px;margin:0;line-height:1.6';
+  p.textContent='영상·모델 자료는 용량이 커서 리포트 스냅샷에 보관하지 않습니다. 해당 시점의 자료는 아래 공식 아카이브에서 조회하실 수 있습니다.';
+  box.append(h,p);
+  const links=document.createElement('div');
+  links.style.cssText='display:flex;gap:16px;flex-wrap:wrap;font-size:13.5px';
+  for(let [href,label] of [[m.href,m.hrefLabel||'공식 아카이브 열기'],[m.href2,m.href2Label]]){
+    if(!href)continue;
+    if(m.dateScoped&&state.replay&&state.replay.capturedAt){
+      const d=new Date(state.replay.capturedAt);
+      if(!isNaN(d)){
+        const day=d.toISOString().slice(0,10),next=new Date(d.getTime()+864e5).toISOString().slice(0,10);
+        href+=`&start_time=${day}T00:00:00Z&end_time=${next}T00:00:00Z`;
+      }
+    }
+    const a=document.createElement('a');
+    a.href=href;a.target='_blank';a.rel='noopener noreferrer';a.textContent=label+' ↗';
+    links.appendChild(a);
+  }
+  box.appendChild(links);
+  return box;
+}
+function swxApplyReplayMasks(on){
+  for(const m of SWX_REPLAY_MASKS){
+    let el=document.querySelector(m.sel);
+    if(!el)continue;
+    if(m.scope==='section')el=el.closest('.section')||el;
+    if(on){
+      if(el.dataset.swxMasked)continue;
+      el.dataset.swxMasked='1';
+      el.dataset.swxDisplay=el.style.display||'';
+      el.style.display='none';
+      const note=swxMaskNotice(m);
+      note.dataset.swxFor=m.sel;
+      el.parentNode.insertBefore(note,el);
+    }else if(el.dataset.swxMasked){
+      el.style.display=el.dataset.swxDisplay||'';
+      delete el.dataset.swxMasked;delete el.dataset.swxDisplay;
+      const note=el.parentNode.querySelector('.swx-replay-mask[data-swx-for="'+m.sel.replace(/"/g,'')+'"]');
+      if(note)note.remove();
+    }
+  }
+  if(!on)document.querySelectorAll('.swx-replay-mask').forEach(n=>n.remove());
+}
 let swxLiveData=null;
 function swxIsReplaying(){return !!state.replay}
 function swxEnterReplay(snap,label){
@@ -1512,6 +1586,7 @@ function swxExitReplay(){
 }
 function swxRenderReplayBanner(){
   let bar=$('replay-bar');
+  swxApplyReplayMasks(!!state.replay);
   if(!state.replay){if(bar)bar.remove();document.body.style.paddingTop='';return}
   if(!bar){
     bar=document.createElement('div');
