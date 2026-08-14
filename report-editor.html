@@ -159,6 +159,22 @@ function utcStamp(d){
   return `${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
 }
 function b64(text){return btoa(String.fromCharCode(...new TextEncoder().encode(text)))}
+function b64bytes(bytes){let s='';const CH=0x8000;for(let i=0;i<bytes.length;i+=CH)s+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH));return btoa(s)}
+async function gzipBytes(text){
+  const cs=new CompressionStream('gzip');
+  const blob=await new Response(new Blob([text]).stream().pipeThrough(cs)).blob();
+  return new Uint8Array(await blob.arrayBuffer());
+}
+// Contents API takes base64 either way, so a gzipped snapshot is just different bytes.
+async function ghPutBytes(path,bytes,message,token){
+  const sha=await ghSha(path,token);
+  const r=await fetch(`https://api.github.com/repos/${STORE.owner}/${STORE.repo}/contents/${path}`,{
+    method:'PUT',
+    headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json','Content-Type':'application/json'},
+    body:JSON.stringify({message,content:b64bytes(bytes),branch:STORE.branch,...(sha?{sha}:{})})
+  });
+  if(!r.ok)throw new Error(`${path} 저장 실패 (HTTP ${r.status})`);
+}
 
 async function ghSha(path,token){
   const r=await fetch(`https://api.github.com/repos/${STORE.owner}/${STORE.repo}/contents/${path}?ref=${STORE.branch}`,
@@ -200,7 +216,7 @@ function currentEntry(){
     id:existing?existing.id:String(now.getTime()),
     createdAt:existing?existing.createdAt:utcStamp(now),
     updatedAt:utcStamp(now),
-    author,reviewer,summary,notes,
+    author,reviewer,summary,notes,snapshot:true,
     text:combineReportText(author,reviewer,summary,notes)
   };
 }
@@ -229,9 +245,29 @@ $('save').onclick=async()=>{
       .sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
     const msg=`${existing?'Update':'Add'} space weather report ${entry.id}`;
     await ghPut(`${STORE.dir}/${entry.id}.txt`,entry.text+'\n',msg,token);
+    // The dashboard holds the live data; ask it for a snapshot of this moment.
+    let snapNote='';
+    try{
+      const snap=window.opener&&!window.opener.closed&&window.opener.swxBuildSnapshot
+        ?window.opener.swxBuildSnapshot():null;
+      if(snap){
+        setStatus('데이터 스냅샷 압축 중…');
+        const gz=await gzipBytes(JSON.stringify(snap));
+        await ghPutBytes(`${STORE.dir}/${entry.id}.snapshot.json.gz`,gz,msg+' (snapshot)',token);
+        snapNote=` · 스냅샷 ${Math.round(gz.length/1024)}KB`;
+      }else{
+        entry.snapshot=false;
+        snapNote=' · 스냅샷 없음 (대시보드 창이 닫혀 있었습니다)';
+      }
+    }catch(e){
+      entry.snapshot=false;
+      snapNote=' · 스냅샷 저장 실패: '+(e.message||e);
+      console.warn('snapshot failed',e);
+    }
+    setStatus('목록 갱신 중…');
     await ghPut(`${STORE.dir}/index.json`,JSON.stringify(next,null,2)+'\n',msg,token);
     existing=entry;
-    setStatus('저장했습니다. 사이트 목록에는 GitHub Pages 배포가 끝난 뒤(보통 1–2분) 나타납니다.','ok');
+    setStatus('저장했습니다'+snapNote+'. 사이트 목록에는 GitHub Pages 배포가 끝난 뒤(보통 1–2분) 나타납니다.','ok');
     try{if(window.opener&&!window.opener.closed)window.opener.postMessage('swx-report-saved',location.origin)}catch(e){}
   }catch(e){
     setStatus(e.message||String(e),'err');

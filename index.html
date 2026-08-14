@@ -1437,6 +1437,115 @@ function buildReportSummary(){
 function combineReportText(author,reviewer,summary,notes){
   return `우주환경 리포트 (Space Weather Report)\n보고자: ${author||'-'}\n검토자: ${reviewer||'-'}\n\n${summary}\n\n${'='.repeat(44)}\n[보고자 작성 의견]\n${notes||'(내용 없음)'}`;
 }
+// ---- Report snapshots -------------------------------------------------------
+// A report records what the dashboard looked like when it was written, so the
+// same view can be reopened later. Series are stored as delta-encoded parallel
+// arrays and gzipped by the editor window: about 60 KB per report instead of 1 MB.
+const SNAP_SERIES=["kp","dst","speed","density","bt","bx","by","bz","xray","proton","protonLog","proton50Log","proton100Log","proton500Log","electron08","electron2","electron08Log","electron2Log","hp30"];
+const SNAP_DIGITS={kp:2,dst:0,speed:1,density:2,bt:2,bx:2,by:2,bz:2,xray:3,hp30:2};
+function snapRound(v,d){const m=10**d;return Math.round(v*m)/m}
+function snapEncode(series,digits){
+  const a=(series||[]).filter(p=>Number.isFinite(p?.t)&&Number.isFinite(p?.v));
+  const t=[],v=[],src=[];let prev=0,lastSrc=null;
+  a.forEach((p,i)=>{
+    t.push(p.t-prev);prev=p.t;
+    v.push(snapRound(p.v,digits));
+    if(p.source&&p.source!==lastSrc){src.push([i,p.source]);lastSrc=p.source}
+  });
+  return src.length?{t,v,src}:{t,v};
+}
+function snapDecode(o){
+  if(!o||!Array.isArray(o.t)||!Array.isArray(o.v))return [];
+  const out=[];let prev=0,si=0,cur=null;
+  for(let i=0;i<o.t.length;i++){
+    prev+=o.t[i];
+    if(o.src&&si<o.src.length&&o.src[si][0]===i){cur=o.src[si][1];si++}
+    const p={t:prev,v:o.v[i]};
+    if(cur)p.source=cur;
+    out.push(p);
+  }
+  return out;
+}
+// Called by the editor window through window.opener at save time.
+window.swxBuildSnapshot=function(){
+  const d=state.data||{},cut=Date.now()-5*864e5,series={};
+  for(const k of SNAP_SERIES)series[k]=snapEncode((d[k]||[]).filter(p=>p.t>=cut),SNAP_DIGITS[k]??2);
+  // The magnetopause standoff is derived from the wind, but storing it keeps the
+  // panel faithful to the Shue model as it stood at writing time.
+  const mp=computeMpR0Series(5).map(p=>[p.t,snapRound(p.v,3),snapRound(p.alpha,4),snapRound(p.pdyn,4)]);
+  return {
+    version:1,
+    capturedAt:new Date().toISOString(),
+    scales:d.scales||{R:0,S:0,G:0,time:''},
+    series,
+    mpR0:mp,
+    events:{cme:d.cme||[],cactusFlow:d.cactusFlow||[],flr:d.flr||[]},
+    goesLon:d.goesLon||[],
+    images:(()=>{const o={};document.querySelectorAll('.image-card img').forEach(img=>{if(img.dataset.key||img.alt)o[img.dataset.key||img.alt]=img.src});return o})()
+  };
+};
+let swxLiveData=null;
+function swxIsReplaying(){return !!state.replay}
+function swxEnterReplay(snap,label){
+  if(!snap||!snap.series){alert('스냅샷을 읽을 수 없습니다.');return}
+  if(!state.replay)swxLiveData=state.data;
+  const data={};
+  for(const k of SNAP_SERIES)data[k]=snapDecode(snap.series[k]);
+  data.scales=snap.scales||{R:0,S:0,G:0,time:''};
+  data.cme=snap.events?.cme||[];data.cactusFlow=snap.events?.cactusFlow||[];data.flr=snap.events?.flr||[];
+  data.goesLon=snap.goesLon||[];
+  data.enlil=[];data.drap=[];data.failedSources=[];
+  state.replay={capturedAt:snap.capturedAt,label:label||snap.capturedAt,mpR0:snap.mpR0||null};
+  state.data=data;
+  $('report-view-modal').classList.remove('open');
+  swxRenderReplayBanner();
+  render();
+  goToView('overview');
+}
+function swxExitReplay(){
+  if(!state.replay)return;
+  state.replay=null;
+  if(swxLiveData)state.data=swxLiveData;
+  swxRenderReplayBanner();
+  render();
+  loadAll();
+}
+function swxRenderReplayBanner(){
+  let bar=$('replay-bar');
+  if(!state.replay){if(bar)bar.remove();document.body.style.paddingTop='';return}
+  if(!bar){
+    bar=document.createElement('div');
+    bar.id='replay-bar';
+    bar.style.cssText='position:fixed;left:0;right:0;top:0;z-index:60;display:flex;align-items:center;justify-content:center;gap:16px;padding:10px 16px;background:#3c2a12;border-bottom:1px solid #7a5a24;color:#ffd36b;font-size:14px;font-weight:600';
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML='';
+  const txt=document.createElement('span');
+  txt.textContent='과거 시점 재생 중 · '+(state.replay.label||'')+' · 실시간 자료가 아닙니다';
+  const btn=document.createElement('button');
+  btn.type='button';btn.className='details-btn';btn.textContent='실시간으로 돌아가기';
+  btn.style.cssText='padding:5px 14px;font-size:13px';
+  btn.onclick=swxExitReplay;
+  bar.append(txt,btn);
+  document.body.style.paddingTop=bar.offsetHeight+'px';
+}
+// Snapshots are gzipped in the repository; unpack them here.
+async function swxLoadSnapshot(id){
+  const base=REPORT_STORE.dir+'/'+id+'.snapshot.json';
+  for(const url of [base+'.gz',base]){
+    try{
+      const r=await fetch('./'+url+'?t='+Date.now(),{cache:'no-store'});
+      if(!r.ok)continue;
+      if(url.endsWith('.gz')){
+        const ds=new DecompressionStream('gzip');
+        const text=await new Response(r.body.pipeThrough(ds)).text();
+        return JSON.parse(text);
+      }
+      return await r.json();
+    }catch(e){console.warn('snapshot load failed',url,e)}
+  }
+  return null;
+}
 // Reports live in the repository, not in this browser: data/reports/index.json holds
 // the entries and data/reports/<id>.txt holds each report as a plain text file, so
 // anyone can read them and they are the same on every machine. Writing needs a
@@ -1611,9 +1720,17 @@ function renderReportViewModal(entry){
   reportViewWeekState.date=parseReportDate(entry.createdAt);
   const summary=entry.summary||entry.text||'';
   const notes=entry.notes||'';
-  box.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;padding-top:34px"><h4 style="margin:0">우주환경 리포트</h4><div style="color:var(--warn);font-size:14px;text-align:right">* 보고서 작성을 위해서는 로그인이 필요합니다</div></div><div style="font-size:15px;color:var(--muted);margin-bottom:12px">${entry.createdAt}&nbsp;&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;&nbsp;보고자: ${entry.author||'-'}&nbsp;&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;&nbsp;검토자: ${entry.reviewer||'-'}</div><div style="display:flex;gap:16px;flex-wrap:wrap"><div style="flex:1;min-width:320px"><div style="font-size:15px;font-weight:600;margin-bottom:6px;color:var(--text)">우주환경 데이터 요약</div><textarea readonly style="width:100%;min-height:45vh;background:#ffffff;color:#111318;border:1px solid var(--border);border-radius:8px;padding:16px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px;line-height:1.75">${summary}</textarea></div><div style="flex:1;min-width:320px"><div style="font-size:15px;font-weight:600;margin-bottom:6px;color:var(--text)">보고자 작성 의견</div><textarea readonly style="width:100%;min-height:45vh;background:#ffffff;color:#111318;border:1px solid var(--border);border-radius:8px;padding:16px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px;line-height:1.75">${notes}</textarea></div></div><div style="display:flex;align-items:center;gap:12px;margin-top:10px"><button id="report-view-dl-btn" type="button" class="details-btn">.txt로 다운로드</button></div><h5 style="margin:18px 0 8px">이 주 보고서</h5><div id="report-view-week-list"></div>`;
+  box.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;padding-top:34px"><h4 style="margin:0">우주환경 리포트</h4><div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px"><div style="color:var(--warn);font-size:14px;text-align:right">* 보고서 작성을 위해서는 로그인이 필요합니다</div>${entry.snapshot?'<button type="button" id="report-replay-btn" class="details-btn" style="padding:7px 16px;font-size:14px">이 시점 데이터로 보기</button>':''}</div></div><div style="font-size:15px;color:var(--muted);margin-bottom:12px">${entry.createdAt}&nbsp;&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;&nbsp;보고자: ${entry.author||'-'}&nbsp;&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;&nbsp;검토자: ${entry.reviewer||'-'}</div><div style="display:flex;gap:16px;flex-wrap:wrap"><div style="flex:1;min-width:320px"><div style="font-size:15px;font-weight:600;margin-bottom:6px;color:var(--text)">우주환경 데이터 요약</div><textarea readonly style="width:100%;min-height:45vh;background:#ffffff;color:#111318;border:1px solid var(--border);border-radius:8px;padding:16px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px;line-height:1.75">${summary}</textarea></div><div style="flex:1;min-width:320px"><div style="font-size:15px;font-weight:600;margin-bottom:6px;color:var(--text)">보고자 작성 의견</div><textarea readonly style="width:100%;min-height:45vh;background:#ffffff;color:#111318;border:1px solid var(--border);border-radius:8px;padding:16px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px;line-height:1.75">${notes}</textarea></div></div><div style="display:flex;align-items:center;gap:12px;margin-top:10px"><button id="report-view-dl-btn" type="button" class="details-btn">.txt로 다운로드</button></div><h5 style="margin:18px 0 8px">이 주 보고서</h5><div id="report-view-week-list"></div>`;
   $('report-view-dl-btn').onclick=()=>downloadTextFile(entry.text||combineReportText(entry.author,entry.reviewer,summary,notes),`space-weather-report-${entry.id}.txt`);
   renderWeekReportList('report-view-week-list',reportViewWeekState,{showActions:false,onOpen:h=>renderReportViewModal(h)});
+  const rb=$('report-replay-btn');
+  if(rb)rb.onclick=async()=>{
+    rb.disabled=true;rb.textContent='불러오는 중…';
+    const snap=await swxLoadSnapshot(entry.id);
+    rb.disabled=false;rb.textContent='이 시점 데이터로 보기';
+    if(!snap){alert('이 리포트의 스냅샷을 찾을 수 없습니다.');return}
+    swxEnterReplay(snap,entry.createdAt);
+  };
 }
 function openReportViewModal(entry){renderReportViewModal(entry);$('report-view-modal').classList.add('open')}
 function renderReportTabList(){
@@ -2684,6 +2801,8 @@ function dipoleTiltDeg(date){
 function subsolarLongitudeDeg(date){const h=date.getUTCHours()+date.getUTCMinutes()/60+date.getUTCSeconds()/3600;let lon=180-h*15;lon=((lon+180)%360+360)%360-180;return lon}
 function nearestValue(series,t,tolMs){let best=NaN,bestDt=Infinity;for(const p of series||[]){const dt=Math.abs(p.t-t);if(dt<bestDt){bestDt=dt;best=p.v}}return bestDt<=tolMs?best:NaN}
 function computeMpR0Series(days=5){
+  if(state.replay&&Array.isArray(state.replay.mpR0))
+    return state.replay.mpR0.map(a=>({t:a[0],v:a[1],alpha:a[2],pdyn:a[3]}));
   const d=state.data,cutoff=Date.now()-days*864e5;
   const bzArr=(d.bz||[]).filter(p=>p.t>cutoff&&Number.isFinite(p.v));
   const out=[];
@@ -3064,6 +3183,7 @@ function drawInteractiveHp30Bars(canvas,data,opts={}){
 function renderGeomagCharts(){const d=state.data,recent=(a,days=7)=>(a||[]).filter(p=>p.t>Date.now()-days*864e5),xRange=[Date.now()-7*864e5,Date.now()+FUTURE_WINDOW_MS];drawInteractiveKpBars($('c-kp2'),recent(d.kp,7),{group:'geomag',xRange,showXAxis:true,rightLabels:[{v:5,label:'G1',color:'#ffe25d'},{v:6,label:'G2',color:'#ffca55'},{v:7,label:'G3',color:'#ff9d50'},{v:8,label:'G4',color:'#ff735f'},{v:9,label:'G5',color:'#ff4f68'}]});drawInteractiveHp30Bars($('c-hp30'),recent(d.hp30,7),{group:'geomag',xRange});const gDst=recent(d.dst,7),gDstr=windDstRange(gDst);drawInteractiveLine($('c-dst'),[{name:'Dst',data:gDst,color:'#b79cff'}],{group:'geomag',xRange,range:gDstr.range,yTicks:gDstr.ticks,zero:true,tooltipFormat:v=>`${v.toFixed(0)} nT`})}
 function render(){const d=state.data;if(!d.kp)return;const kpP=latestPoint(d.kp),dstP=latestPoint(d.dst),speedP=latestPoint(d.speed),densityP=latestPoint(d.density),bzP=latestPoint(d.bz),xP=latestPoint(d.xray),protonP=latestPoint(d.proton),electronP=latestPoint(d.electron2||d.electron08),btP=latestPoint(d.bt),bxP=latestPoint(d.bx),byP=latestPoint(d.by);const kp=kpP?.v,dst=dstP?.v,speed=speedP?.v,density=densityP?.v,bz=bzP?.v,x=xP?.v,proton=protonP?.v;$('m-kp').textContent=fmt(kp,1);$('m-kp-foot').textContent=kp>=9?'NOAA G5 threshold':kp>=8?'NOAA G4 threshold':kp>=7?'NOAA G3 threshold':kp>=6?'NOAA G2 threshold':kp>=5?'NOAA G1 threshold':'Below NOAA G1 threshold';$('m-dst').textContent=fmt(dst,0);$('m-speed').textContent=fmt(speed,0);$('m-bz').textContent=fmt(bz,1);$('m-bz').className='metric-value '+(bz<0?'danger-text':'good-text');$('m-bz-foot').textContent=bz<0?'Southward IMF: enhanced coupling possible':'Northward/weak Bz';$('v-kp').textContent=`NOW: Kp ${fmt(kp,1)}`;$('v-speed').textContent=`NOW: ${fmt(speed,0)} km/s`;$('v-xray').textContent=`NOW: ${Number.isFinite(x)?(10**x).toExponential(2):'--'} W/m² · ${xrayClass(x)}`;$('v-wind-speed').textContent=`NOW: ${fmt(speed,0)} km/s`;$('v-density').textContent=`NOW: ${fmt(density,2)} p/cm³`;$('v-bt').textContent=`NOW: ${fmt(btP?.v,1)} nT`;$('v-bx').textContent=`NOW: ${fmt(bxP?.v,1)} nT`;$('v-by').textContent=`NOW: ${fmt(byP?.v,1)} nT`;$('v-bz-wind').textContent=`NOW: ${fmt(bz,1)} nT`;$('v-kp2').textContent=`NOW: Kp ${fmt(kp,1)}`;const hp30P=latestPoint(d.hp30||[]);$('v-hp30').textContent=`NOW: Hp30 ${fmt(hp30P?.v,1)}`;const hpStatus=$('hp30-source-status');if(hpStatus){const arr=d.hp30||[],n=arr.length,last=latestPoint(arr),age=last?Date.now()-last.t:Infinity;const lastText=last?new Date(last.t).toISOString().slice(0,16).replace('T',' ')+' UTC':'--';const stale=age>90*60*1000;hpStatus.firstChild.textContent=n?`30분 해상도 · 최근 7일 · ${n} points · latest ${lastText}${stale?' · 지연':''} · `:'30분 해상도 · 최근 7일 · 데이터 요청 실패 · ';hpStatus.style.color=!n||stale?'#ffb36b':'';}const hpLink=$('hp30-source-link');if(hpLink)hpLink.href=buildHp30Url();$('v-dst').textContent=`NOW: ${fmt(dst,0)} nT`;$('v-proton').textContent=`NOW: ${fmt(proton,1)} pfu`;$('v-electron').textContent=`NOW: ${Number.isFinite(electronP?.v)?electronP.v.toExponential(2):'--'} e⁻/(cm²·s·sr)`;renderScales(d.scales);const recent=(a,days=2)=>a.filter(p=>p.t>Date.now()-days*864e5);const ovXRange=[Date.now()-3*864e5,Date.now()+FUTURE_WINDOW_MS];drawInteractiveKpBars($('c-kp'),recent(d.kp,3),{group:'overview',xRange:ovXRange,rightLabels:[{v:5,label:'G1',color:'#ffe25d'},{v:6,label:'G2',color:'#ffca55'},{v:7,label:'G3',color:'#ff9d50'},{v:8,label:'G4',color:'#ff735f'},{v:9,label:'G5',color:'#ff4f68'}]});const ovDst=recent(d.dst,3),ovDstr=windDstRange(ovDst);$('v-dst-overview').textContent=`NOW: ${fmt(dst,0)} nT`;drawInteractiveLine($('c-overview-dst'),[{name:'Dst',data:ovDst,color:'#b79cff'}],{group:'overview',xRange:ovXRange,range:ovDstr.range,yTicks:ovDstr.ticks,zero:true,tooltipFormat:v=>`${v.toFixed(0)} nT`});const ovSpeed=recent(d.speed,3),ovSpeedr=windSpeedRange(ovSpeed);drawInteractiveLine($('c-overview-wind'),[{name:'Speed',data:ovSpeed,color:'#67d6ff'}],{group:'overview',xRange:ovXRange,range:ovSpeedr.range,yTicks:ovSpeedr.ticks,tooltipFormat:v=>`${v.toFixed(0)} km/s`});const ovBz=recent(d.bz,3),ovBzr=windSymmetricRange(ovBz,10);$('v-bz-overview').textContent=`NOW: ${fmt(bz,1)} nT`;drawInteractiveLine($('c-overview-bz'),[{name:'Bz',data:ovBz,color:'#ff8aa2'}],{group:'overview',xRange:ovXRange,range:ovBzr.range,yTicks:ovBzr.ticks,zero:true,tooltipFormat:v=>`${v.toFixed(2)} nT`});$('v-xray-overview').textContent=`NOW: ${Number.isFinite(x)?(10**x).toExponential(2):'--'} W/m² · ${xrayClass(x)}`;drawInteractiveLine($('c-overview-xray'),[{name:'Flux',data:recent(d.xray,3),color:'#ffd36b'}],{group:'overview',xRange:ovXRange,range:[-9,-3],yTicks:[-3,-4,-5,-6,-7,-8,-9],powerTicks:true,rightLabels:[{v:-6,label:'C',color:'#7ee7b7'},{v:-5,label:'M',color:'#ffd36b'},{v:-4,label:'X',color:'#ff7e8a'}],tooltipFormat:v=>`${(10**v).toExponential(2)} W/m²`});$('v-proton-overview').textContent=`NOW: ${fmt(proton,1)} pfu`;drawInteractiveLine($('c-overview-proton'),[{name:'≥10 MeV',data:recent(d.protonLog,3),color:'#ff5d45'}],{group:'overview',xRange:ovXRange,range:[-2,5],yTicks:[5,4,3,2,1,0,-1,-2],powerTicks:true,rightLabels:[{v:1,label:'S1',color:'#ffe25d'},{v:2,label:'S2',color:'#ffca55'},{v:3,label:'S3',color:'#ff9d50'}],tooltipFormat:v=>`${(10**v).toFixed(v<1?2:1)} pfu`});drawInteractiveLine($('c-xray'),[{name:'Flux',data:recent(d.xray,7),color:'#ffd36b'}],{group:'solar',xRange:[Date.now()-7*864e5,Date.now()+FUTURE_WINDOW_MS],range:[-9,-3],yTicks:[-3,-4,-5,-6,-7,-8,-9],powerTicks:true,rightLabels:[{v:-6,label:'C',color:'#7ee7b7'},{v:-5,label:'M',color:'#ffd36b'},{v:-4,label:'X',color:'#ff7e8a'}],tooltipFormat:v=>`${(10**v).toExponential(2)} W/m²`,markers:detectXrayFlarePeaks(recent(d.xray,7),{minDropLog:0.18,minGapMs:40*60000})});renderWindCharts();drawEnlil();renderGeomagCharts();drawInteractiveLine($('c-proton'),[{name:'≥10 MeV',data:recent(d.protonLog,7),color:'#ff5d45'},{name:'≥50 MeV',data:recent(d.proton50Log,7),color:'#6f7cff'},{name:'≥100 MeV',data:recent(d.proton100Log,7),color:'#55e66b'},{name:'≥500 MeV',data:recent(d.proton500Log,7),color:'#ffb14d'}],{group:'radiation',xRange:[Date.now()-7*864e5,Date.now()+FUTURE_WINDOW_MS],range:[-2,5],yTicks:[5,4,3,2,1,0,-1,-2],powerTicks:true,rightLabels:[{v:1,label:'S1 · 10 pfu',color:'#ffe25d'},{v:2,label:'S2 · 100',color:'#ffca55'},{v:3,label:'S3 · 1k',color:'#ff9d50'},{v:4,label:'S4 · 10k',color:'#ff735f'},{v:5,label:'S5 · 100k',color:'#ff4f68'}],tooltipFormat:(v,n)=>`${(10**v).toFixed(v<1?2:1)} pfu`,markers:detectEpisodes((d.proton||[]).filter(p=>p.t>Date.now()-7*864e5),10,2*36e5).map(e=>({t:e.start,grade:sScale(e.max),time:new Date(e.start).toISOString().slice(0,16).replace('T',' ')+' UTC (start)',color:'#ffe25d'}))});drawInteractiveLine($('c-electron'),[{name:'≥0.8 MeV',data:recent(d.electron08Log||[],7),color:'#67d6ff'},{name:'≥2 MeV',data:recent(d.electron2Log||[],7),color:'#ffd36b'}],{group:'radiation',xRange:[Date.now()-7*864e5,Date.now()+FUTURE_WINDOW_MS],range:[0,7],yTicks:[7,6,5,4,3,2,1,0],powerTicks:true,rightLabels:[{v:3,label:'Alert · 1k',color:'#ff9d50'}],tooltipFormat:(v,n)=>`${(10**v).toExponential(2)} e⁻/(cm²·s·sr)`});renderDonki(d);renderMagnetopause()}
 async function loadAll(){
+  if(state.replay)return;
   if(state.loading)return;
   state.loading=true;$('refresh').disabled=true;setStatus('NOAA 실시간 자료 수신 중...');
   const requests={
