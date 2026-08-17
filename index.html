@@ -1560,7 +1560,7 @@ function swxApplyReplayMasks(on){
 }
 let swxLiveData=null;
 function swxIsReplaying(){return !!state.replay}
-function swxEnterReplay(snap,label){
+function swxEnterReplay(snap,label,entry){
   if(!snap||!snap.series){alert('스냅샷을 읽을 수 없습니다.');return}
   if(!state.replay)swxLiveData=state.data;
   const data={};
@@ -1569,7 +1569,11 @@ function swxEnterReplay(snap,label){
   data.cme=snap.events?.cme||[];data.cactusFlow=snap.events?.cactusFlow||[];data.flr=snap.events?.flr||[];
   data.goesLon=snap.goesLon||[];
   data.enlil=[];data.drap=[];data.failedSources=[];
-  state.replay={capturedAt:snap.capturedAt,label:label||snap.capturedAt,mpR0:snap.mpR0||null};
+  // Coming back should land where the user left, not on the overview.
+  const openModal=$('report-view-modal').classList.contains('open');
+  const cur=document.querySelector('section.view.active');
+  state.replay={capturedAt:snap.capturedAt,label:label||snap.capturedAt,mpR0:snap.mpR0||null,
+    from:{view:cur?cur.id:null,entry:openModal?entry:null}};
   state.data=data;
   $('report-view-modal').classList.remove('open');
   swxRenderReplayBanner();
@@ -1578,10 +1582,13 @@ function swxEnterReplay(snap,label){
 }
 function swxExitReplay(){
   if(!state.replay)return;
+  const from=state.replay.from||{};
   state.replay=null;
   if(swxLiveData)state.data=swxLiveData;
   swxRenderReplayBanner();
   render();
+  if(from.view)goToView(from.view);
+  if(from.entry)openReportViewModal(from.entry);
   loadAll();
 }
 function swxRenderReplayBanner(){
@@ -1795,16 +1802,18 @@ function renderReportViewModal(entry){
   reportViewWeekState.date=parseReportDate(entry.createdAt);
   const summary=entry.summary||entry.text||'';
   const notes=entry.notes||'';
-  box.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;padding-top:34px"><h4 style="margin:0">우주환경 리포트</h4><div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px"><div style="color:var(--warn);font-size:14px;text-align:right">* 보고서 작성을 위해서는 로그인이 필요합니다</div><button type="button" id="report-replay-btn" class="details-btn" style="padding:7px 16px;font-size:14px">이 시점 데이터로 보기</button></div></div><div style="font-size:15px;color:var(--muted);margin-bottom:12px">${entry.createdAt}&nbsp;&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;&nbsp;보고자: ${entry.author||'-'}&nbsp;&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;&nbsp;검토자: ${entry.reviewer||'-'}</div><div style="display:flex;gap:16px;flex-wrap:wrap"><div style="flex:1;min-width:320px"><div style="font-size:15px;font-weight:600;margin-bottom:6px;color:var(--text)">우주환경 데이터 요약</div><textarea readonly style="width:100%;min-height:45vh;background:#ffffff;color:#111318;border:1px solid var(--border);border-radius:8px;padding:16px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px;line-height:1.75">${summary}</textarea></div><div style="flex:1;min-width:320px"><div style="font-size:15px;font-weight:600;margin-bottom:6px;color:var(--text)">보고자 작성 의견</div><textarea readonly style="width:100%;min-height:45vh;background:#ffffff;color:#111318;border:1px solid var(--border);border-radius:8px;padding:16px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px;line-height:1.75">${notes}</textarea></div></div><div style="display:flex;align-items:center;gap:12px;margin-top:10px"><button id="report-view-dl-btn" type="button" class="details-btn">.txt로 다운로드</button></div><h5 style="margin:18px 0 8px">이 주 보고서</h5><div id="report-view-week-list"></div>`;
+  box.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;padding-top:34px"><h4 style="margin:0">우주환경 리포트</h4><div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px"><div style="color:var(--warn);font-size:14px;text-align:right">* 보고서 작성을 위해서는 로그인이 필요합니다</div><div style="display:flex;gap:8px"><button type="button" id="report-replay-btn" class="details-btn" style="padding:7px 16px;font-size:14px">이 시점 데이터로 보기</button>${isReportAuthed()?'<button type="button" id="report-edit-btn" class="details-btn" style="padding:7px 16px;font-size:14px">수정</button>':''}</div></div></div><div style="font-size:15px;color:var(--muted);margin-bottom:12px">${entry.createdAt}&nbsp;&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;&nbsp;보고자: ${entry.author||'-'}&nbsp;&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;&nbsp;검토자: ${entry.reviewer||'-'}</div><div style="display:flex;gap:16px;flex-wrap:wrap"><div style="flex:1;min-width:320px"><div style="font-size:15px;font-weight:600;margin-bottom:6px;color:var(--text)">우주환경 데이터 요약</div><textarea readonly style="width:100%;min-height:45vh;background:#ffffff;color:#111318;border:1px solid var(--border);border-radius:8px;padding:16px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px;line-height:1.75">${summary}</textarea></div><div style="flex:1;min-width:320px"><div style="font-size:15px;font-weight:600;margin-bottom:6px;color:var(--text)">보고자 작성 의견</div><textarea readonly style="width:100%;min-height:45vh;background:#ffffff;color:#111318;border:1px solid var(--border);border-radius:8px;padding:16px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px;line-height:1.75">${notes}</textarea></div></div><div style="display:flex;align-items:center;gap:12px;margin-top:10px"><button id="report-view-dl-btn" type="button" class="details-btn">.txt로 다운로드</button></div><h5 style="margin:18px 0 8px">이 주 보고서</h5><div id="report-view-week-list"></div>`;
   $('report-view-dl-btn').onclick=()=>downloadTextFile(entry.text||combineReportText(entry.author,entry.reviewer,summary,notes),`space-weather-report-${entry.id}.txt`);
   renderWeekReportList('report-view-week-list',reportViewWeekState,{showActions:false,onOpen:h=>renderReportViewModal(h)});
+  const eb=$('report-edit-btn');
+  if(eb)eb.onclick=()=>{$('report-view-modal').classList.remove('open');openReportEditorWindow(entry)};
   const rb=$('report-replay-btn');
   if(rb)rb.onclick=async()=>{
     rb.disabled=true;rb.textContent='불러오는 중…';
     const snap=await swxLoadSnapshot(entry.id);
     rb.disabled=false;rb.textContent='이 시점 데이터로 보기';
     if(!snap){alert('이 리포트에는 데이터 스냅샷이 없습니다.\n스냅샷 기능을 적용하기 전에 저장된 리포트이거나, 저장 당시 대시보드 창이 닫혀 있었습니다.');return}
-    swxEnterReplay(snap,entry.createdAt);
+    swxEnterReplay(snap,entry.createdAt,entry);
   };
 }
 function openReportViewModal(entry){renderReportViewModal(entry);$('report-view-modal').classList.add('open')}
@@ -1815,7 +1824,7 @@ function renderReportTabList(){
   const history=reportHistory().filter(h=>{const t=Date.parse((h.createdAt||'').replace(' UTC','Z').replace(' ','T'));return Number.isFinite(t)&&t>=start.getTime()&&t<=end.getTime()});
   const dlAllBtn=history.length?`<button type="button" id="report-week-dl-all" class="details-btn" style="margin-bottom:8px">이 주 보고서 전체 다운로드 (${history.length}건)</button>`:'';
   box.innerHTML=dlAllBtn+(history.length?history.map(h=>`<div class="event-item" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px" data-report-open="${h.id}"><span>${h.createdAt} · 보고자: ${h.author||'-'} · 검토자: ${h.reviewer||'-'}</span><button type="button" class="details-btn" data-report-tab-dl="${h.id}" style="padding:4px 10px">다운로드</button></span></div>`).join(''):'<div class="event-empty">이 주에 저장된 리포트 없음</div>');
-  box.querySelectorAll('[data-report-open]').forEach(el=>el.addEventListener('click',e=>{if(e.target.closest('[data-report-tab-dl]'))return;const h=reportHistory().find(x=>x.id===el.dataset.reportOpen);if(!h)return;if(isReportAuthed())openReportModal(h);else openReportViewModal(h)}));
+  box.querySelectorAll('[data-report-open]').forEach(el=>el.addEventListener('click',e=>{if(e.target.closest('[data-report-tab-dl]'))return;const h=reportHistory().find(x=>x.id===el.dataset.reportOpen);if(!h)return;openReportViewModal(h)}));
   box.querySelectorAll('[data-report-tab-dl]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();const h=reportHistory().find(x=>x.id===b.dataset.reportTabDl);if(h)downloadTextFile(h.text,`space-weather-report-${h.id}.txt`)}));
   if($('report-week-dl-all'))$('report-week-dl-all').onclick=()=>{const combined=history.map(h=>`===== ${h.createdAt} · 보고자: ${h.author||'-'} · 검토자: ${h.reviewer||'-'} =====\n\n${h.text}`).join('\n\n\n');downloadTextFile(combined,`space-weather-reports-${fmtYmd(start)}_${fmtYmd(end)}.txt`)};
 }
