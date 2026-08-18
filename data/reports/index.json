@@ -1,5 +1,16 @@
 [
   {
+    "id": "1787019422392",
+    "createdAt": "2026-08-18 02:17 UTC",
+    "updatedAt": "2026-08-18 02:17 UTC",
+    "author": "테스트 김정헌",
+    "reviewer": "테스트 김정헌",
+    "summary": "작성 시각: 2026-08-18 02:16 UTC\n\n[최근 24시간 요약]\n항목                    | 최저    | 최대   | 평균   | 단위  \n----------------------|-------|------|------|-----\nKp                    | 1.3   | 3.7  | 2.5  | -   \nDst                   | -44   | 1    | -13  | nT  \nSolar Wind Speed      | 295   | 435  | 337  | km/s\nProton Density        | 3.1   | 35.8 | 14.3 | /cm³\nIMF Bz                | -12.2 | 10.2 | -1.2 | nT  \nProton Flux (≥10 MeV) | 0.2   | 0.3  | 0.2  | pfu \n\n[현재 지표]\nPlanetary Kp: 3.7\nDst Index: -44 nT\nSolar Wind Speed: 414 km/s\nProton Density: 13.5 /cm³\nIMF Bz: -7.4 nT\nGOES X-ray Flux: 8.03e-7 W/m² (B8.0)\nProton Flux (≥10 MeV): 0.2 pfu\n\n[NOAA Space Weather Scales]\nR (Radio Blackout): R0 · S (Solar Radiation Storm): S0 · G (Geomagnetic Storm): G0\n\n[CME - CACTUS 자동 검출, 최근 5일]\n- #0016 2026-08-15 16:12 UTC · 208km/s · PA271° · width24°\n- #0015 2026-08-15 11:36 UTC · 291km/s · PA21° · width40°\n- #0014 2026-08-15 03:00 UTC · 241km/s · PA41° · width32°\n- #0013 2026-08-14 22:12 UTC · 300km/s · PA22° · width42°\n- #0012 2026-08-14 18:12 UTC · 306km/s · PA243° · width12°\n\n[Solar Flare - NASA DONKI, 최근 7일]\n- C2.0 · 2026-08-17 16:18 UTC · AR14510\n- C8.2 · 2026-08-16 19:01 UTC · AR14506\n- C4.1 · 2026-08-14 06:38 UTC · AR14503\n\n[Geomagnetic Storm - Kp 실시간 감지, 최근 5일]\n- 없음\n\n[Solar Proton Events - proton flux 실시간 감지, 최근 5일]\n- 없음",
+    "notes": "테스트,,,",
+    "snapshot": true,
+    "text": "우주환경 리포트 (Space Weather Report)\n보고자: 테스트 김정헌\n검토자: 테스트 김정헌\n\n작성 시각: 2026-08-18 02:16 UTC\n\n[최근 24시간 요약]\n항목                    | 최저    | 최대   | 평균   | 단위  \n----------------------|-------|------|------|-----\nKp                    | 1.3   | 3.7  | 2.5  | -   \nDst                   | -44   | 1    | -13  | nT  \nSolar Wind Speed      | 295   | 435  | 337  | km/s\nProton Density        | 3.1   | 35.8 | 14.3 | /cm³\nIMF Bz                | -12.2 | 10.2 | -1.2 | nT  \nProton Flux (≥10 MeV) | 0.2   | 0.3  | 0.2  | pfu \n\n[현재 지표]\nPlanetary Kp: 3.7\nDst Index: -44 nT\nSolar Wind Speed: 414 km/s\nProton Density: 13.5 /cm³\nIMF Bz: -7.4 nT\nGOES X-ray Flux: 8.03e-7 W/m² (B8.0)\nProton Flux (≥10 MeV): 0.2 pfu\n\n[NOAA Space Weather Scales]\nR (Radio Blackout): R0 · S (Solar Radiation Storm): S0 · G (Geomagnetic Storm): G0\n\n[CME - CACTUS 자동 검출, 최근 5일]\n- #0016 2026-08-15 16:12 UTC · 208km/s · PA271° · width24°\n- #0015 2026-08-15 11:36 UTC · 291km/s · PA21° · width40°\n- #0014 2026-08-15 03:00 UTC · 241km/s · PA41° · width32°\n- #0013 2026-08-14 22:12 UTC · 300km/s · PA22° · width42°\n- #0012 2026-08-14 18:12 UTC · 306km/s · PA243° · width12°\n\n[Solar Flare - NASA DONKI, 최근 7일]\n- C2.0 · 2026-08-17 16:18 UTC · AR14510\n- C8.2 · 2026-08-16 19:01 UTC · AR14506\n- C4.1 · 2026-08-14 06:38 UTC · AR14503\n\n[Geomagnetic Storm - Kp 실시간 감지, 최근 5일]\n- 없음\n\n[Solar Proton Events - proton flux 실시간 감지, 최근 5일]\n- 없음\n\n============================================\n[보고자 작성 의견]\n테스트,,,"
+  },
+  {
     "id": "1786981302980",
     "createdAt": "2026-08-17 15:41 UTC",
     "updatedAt": "2026-08-17 15:41 UTC",
