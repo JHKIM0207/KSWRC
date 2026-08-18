@@ -1,0 +1,49 @@
+우주환경 리포트 (Space Weather Report)
+보고자: 테스트 김정헌
+검토자: 테스트 김정헌
+
+작성 시각: 2026-08-18 02:16 UTC
+
+[최근 24시간 요약]
+항목                    | 최저    | 최대   | 평균   | 단위  
+----------------------|-------|------|------|-----
+Kp                    | 1.3   | 3.7  | 2.5  | -   
+Dst                   | -44   | 1    | -13  | nT  
+Solar Wind Speed      | 295   | 435  | 337  | km/s
+Proton Density        | 3.1   | 35.8 | 14.3 | /cm³
+IMF Bz                | -12.2 | 10.2 | -1.2 | nT  
+Proton Flux (≥10 MeV) | 0.2   | 0.3  | 0.2  | pfu 
+
+[현재 지표]
+Planetary Kp: 3.7
+Dst Index: -44 nT
+Solar Wind Speed: 414 km/s
+Proton Density: 13.5 /cm³
+IMF Bz: -7.4 nT
+GOES X-ray Flux: 8.03e-7 W/m² (B8.0)
+Proton Flux (≥10 MeV): 0.2 pfu
+
+[NOAA Space Weather Scales]
+R (Radio Blackout): R0 · S (Solar Radiation Storm): S0 · G (Geomagnetic Storm): G0
+
+[CME - CACTUS 자동 검출, 최근 5일]
+- #0016 2026-08-15 16:12 UTC · 208km/s · PA271° · width24°
+- #0015 2026-08-15 11:36 UTC · 291km/s · PA21° · width40°
+- #0014 2026-08-15 03:00 UTC · 241km/s · PA41° · width32°
+- #0013 2026-08-14 22:12 UTC · 300km/s · PA22° · width42°
+- #0012 2026-08-14 18:12 UTC · 306km/s · PA243° · width12°
+
+[Solar Flare - NASA DONKI, 최근 7일]
+- C2.0 · 2026-08-17 16:18 UTC · AR14510
+- C8.2 · 2026-08-16 19:01 UTC · AR14506
+- C4.1 · 2026-08-14 06:38 UTC · AR14503
+
+[Geomagnetic Storm - Kp 실시간 감지, 최근 5일]
+- 없음
+
+[Solar Proton Events - proton flux 실시간 감지, 최근 5일]
+- 없음
+
+============================================
+[보고자 작성 의견]
+테스트,,,
