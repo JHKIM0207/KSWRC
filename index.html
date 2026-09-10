@@ -2232,6 +2232,43 @@ function buildHp30Url(){
   const iso=d=>d.toISOString().replace(/\.\d{3}Z$/,'Z');
   return `https://kp.gfz.de/app/json/?start=${encodeURIComponent(iso(start))}&end=${encodeURIComponent(iso(end))}&index=Hp30`;
 }
+
+// kp.gfz.de sends no CORS header, so a browser fetch of the live URL always fails.
+// Order: same-origin archive written by GitHub Actions, then the direct URL (works
+// only if GFZ ever enables CORS), then text proxies. r.jina.ai wraps the JSON in
+// markdown, so the body is scanned for the outermost JSON object.
+function hp30ExtractJson(text){
+  try{return JSON.parse(text)}catch(e){}
+  const a=text.indexOf('{'),b=text.lastIndexOf('}');
+  if(a>=0&&b>a){try{return JSON.parse(text.slice(a,b+1))}catch(e){}}
+  return null;
+}
+async function fetchHp30(){
+  const direct=buildHp30Url(),nonce=Date.now();
+  const urls=[
+    `./data/hp30.json?t=${nonce}`,
+    direct,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(direct)}&cache=${nonce}`,
+    `https://r.jina.ai/${direct}`
+  ];
+  let last=null;
+  for(const url of urls){
+    try{
+      const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),20000);
+      let text;
+      try{
+        const r=await fetch(url,{cache:'no-store',signal:ctl.signal});
+        if(!r.ok)throw new Error(`${r.status} ${url}`);
+        text=await r.text();
+      }finally{clearTimeout(timer)}
+      const obj=hp30ExtractJson(text);
+      const vals=obj&&(obj.Hp30||obj.hp30);
+      if(!Array.isArray(vals)||!vals.length)throw new Error(`Empty Hp30 payload: ${url}`);
+      return obj;
+    }catch(e){last=e;console.warn('Hp30 source failed',url,e)}
+  }
+  throw last||new Error('Hp30 unavailable');
+}
 function parseHp30Product(raw){
   const out=[];
   const push=(t,v)=>{
@@ -3303,16 +3340,7 @@ async function loadAll(){
     enlil:()=>safeFetch(ENDPOINTS.enlil),
     drap:()=>fetchDrapFrames(),
     goesLon:()=>safeFetch(ENDPOINTS.goesLon),
-    hp30:()=>{
-      const direct=buildHp30Url();
-      const nonce=Date.now();
-      const fallbacks=[
-        direct,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(direct)}&cache=${nonce}`,
-        `https://corsproxy.io/?url=${encodeURIComponent(direct)}&cache=${nonce}`
-      ];
-      return fetchDonkiFirstNonEmpty(fallbacks);
-    }
+    hp30:()=>fetchHp30()
   };
   try{
     const names=Object.keys(requests);
