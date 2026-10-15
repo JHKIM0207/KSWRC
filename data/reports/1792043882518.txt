@@ -1,0 +1,47 @@
+우주환경 리포트 (Space Weather Report)
+보고자: 강주형
+검토자: Yukinaga Miyashita
+
+작성 시각: 2026-10-15 05:46 UTC
+
+[최근 24시간 요약]
+항목                    | 최저   | 최대  | 평균  | 단위  
+----------------------|------|-----|-----|-----
+Kp                    | 1.7  | 2.7 | 2.2 | -   
+Dst                   | -18  | 5   | -7  | nT  
+Solar Wind Speed      | 471  | 609 | 535 | km/s
+Proton Density        | 1.0  | 8.4 | 3.3 | /cm³
+IMF Bz                | -6.1 | 6.6 | 0.9 | nT  
+Proton Flux (≥10 MeV) | 0.2  | 0.4 | 0.2 | pfu 
+
+[현재 지표]
+Planetary Kp: 2.0
+Dst Index: -10 nT
+Solar Wind Speed: 513 km/s
+Proton Density: 2.0 /cm³
+IMF Bz: -0.8 nT
+GOES X-ray Flux: 6.49e-7 W/m² (B6.5)
+Proton Flux (≥10 MeV): 0.2 pfu
+
+[NOAA Space Weather Scales]
+R (Radio Blackout): R0 · S (Solar Radiation Storm): S0 · G (Geomagnetic Storm): G0
+
+[CME - CACTUS 자동 검출, 최근 5일]
+- #0025 2026-10-14 23:00 UTC · 358km/s · PA38° · width42°
+- #0024 2026-10-14 13:36 UTC · 240km/s · PA22° · width66°
+- #0023 2026-10-13 13:26 UTC · 372km/s · PA318° · width6°
+- #0022 2026-10-13 11:01 UTC · 884km/s · PA312° · width6°
+- #0021 2026-10-13 04:36 UTC · 1190km/s · PA300° · width14°
+
+[Solar Flare - NASA DONKI, 최근 7일]
+- 없음
+
+[Geomagnetic Storm - Kp 실시간 감지, 최근 5일]
+- G3 · Kp 7.0 · 시작 2026-10-10 15:00 UTC
+
+[Solar Proton Events - proton flux 실시간 감지, 최근 5일]
+- 없음
+
+============================================
+[보고자 작성 의견]
+최근 24시간 동안 C7.0 플레어가 AR14551에서 발생함. 동반된 halo CME는 관측되지 않음. 현재 Kp 지수는 2.0으로 비교적 안정적이고 IMF Bz도 안정적임. 별다른 proton events도 없이 조용하였음. 며칠간 같은 활동지역에서 플레어가 발생하는 것으로 보아 당분간 주의는 필요함. 다만 halo CME가 없던 것으로 보아 향후 3일간은 별다른 solar radiation storm이나 Geomagnetic storm은 일어나지 않을 것으로 예상됨.
