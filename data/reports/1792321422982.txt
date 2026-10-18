@@ -1,0 +1,47 @@
+우주환경 리포트 (Space Weather Report)
+보고자: 강주형
+검토자: Yukinaga Miyashita
+
+작성 시각: 2026-10-18 10:47 UTC
+
+[최근 24시간 요약]
+항목                    | 최저   | 최대   | 평균  | 단위  
+----------------------|------|------|-----|-----
+Kp                    | 0.7  | 3.0  | 2.0 | -   
+Dst                   | -17  | 2    | -9  | nT  
+Solar Wind Speed      | 399  | 554  | 470 | km/s
+Proton Density        | 0.8  | 29.4 | 4.8 | /cm³
+IMF Bz                | -6.5 | 7.7  | 1.2 | nT  
+Proton Flux (≥10 MeV) | 0.2  | 0.4  | 0.2 | pfu 
+
+[현재 지표]
+Planetary Kp: 2.0
+Dst Index: -13 nT
+Solar Wind Speed: 453 km/s
+Proton Density: 2.9 /cm³
+IMF Bz: 2.5 nT
+GOES X-ray Flux: 6.61e-7 W/m² (B6.6)
+Proton Flux (≥10 MeV): 0.2 pfu
+
+[NOAA Space Weather Scales]
+R (Radio Blackout): R0 · S (Solar Radiation Storm): S0 · G (Geomagnetic Storm): G0
+
+[CME - CACTUS 자동 검출, 최근 5일]
+- #0021 2026-10-17 17:00 UTC · 354km/s · PA96° · width10°
+- #0020 2026-10-17 05:24 UTC · 351km/s · PA102° · width14°
+- #0019 2026-10-17 05:12 UTC · 590km/s · PA104° · width10°
+- #0018 2026-10-17 04:12 UTC · 1454km/s · PA8° · width10°
+- #0017 2026-10-17 02:48 UTC · 665km/s · PA78° · width102° · HALO II
+
+[Solar Flare - NASA DONKI, 최근 7일]
+- 없음
+
+[Geomagnetic Storm - Kp 실시간 감지, 최근 5일]
+- 없음
+
+[Solar Proton Events - proton flux 실시간 감지, 최근 5일]
+- 없음
+
+============================================
+[보고자 작성 의견]
+18일 10 UT까지 24시간 동안 상대적으로 특별한 이벤트가 없이 조용하였음. C3.7급 플레어가 발생하긴 하였으나 동반된 헤일로 CME는 따로 관측되지 않음. Kp 지수 역시 안정적이고, Dst 지수도 안정적이었음. 별다른 proton event나 electron event도 관측되지 않음. 다만 며칠 전까지 코로나홀이 태양 전면에 있던 만큼 20일쯤에 여전히 G1이벤트가 발생할 확률이 있다고 여겨짐.
