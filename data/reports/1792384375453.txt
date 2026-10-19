@@ -1,0 +1,47 @@
+우주환경 리포트 (Space Weather Report)
+보고자: 강주형
+검토자: Yukinaga Miyashita
+
+작성 시각: 2026-10-19 04:28 UTC
+
+[최근 24시간 요약]
+항목                    | 최저   | 최대   | 평균  | 단위  
+----------------------|------|------|-----|-----
+Kp                    | 0.3  | 2.0  | 1.1 | -   
+Dst                   | -17  | -1   | -10 | nT  
+Solar Wind Speed      | 380  | 554  | 445 | km/s
+Proton Density        | 0.8  | 29.4 | 2.4 | /cm³
+IMF Bz                | -4.1 | 5.4  | 1.1 | nT  
+Proton Flux (≥10 MeV) | 0.2  | 0.4  | 0.2 | pfu 
+
+[현재 지표]
+Planetary Kp: 0.3
+Dst Index: -1 nT
+Solar Wind Speed: 396 km/s
+Proton Density: 2.1 /cm³
+IMF Bz: 2.3 nT
+GOES X-ray Flux: 8.47e-7 W/m² (B8.5)
+Proton Flux (≥10 MeV): 0.2 pfu
+
+[NOAA Space Weather Scales]
+R (Radio Blackout): R0 · S (Solar Radiation Storm): S0 · G (Geomagnetic Storm): G0
+
+[CME - CACTUS 자동 검출, 최근 5일]
+- #0024 2026-10-18 17:24 UTC · 670km/s · PA330° · width34°
+- #0023 2026-10-18 08:36 UTC · 125km/s · PA311° · width8°
+- #0022 2026-10-18 05:36 UTC · 206km/s · PA303° · width52°
+- #0021 2026-10-17 05:24 UTC · 351km/s · PA102° · width14°
+- #0020 2026-10-17 05:12 UTC · 590km/s · PA104° · width10°
+
+[Solar Flare - NASA DONKI, 최근 7일]
+- 없음
+
+[Geomagnetic Storm - Kp 실시간 감지, 최근 5일]
+- 없음
+
+[Solar Proton Events - proton flux 실시간 감지, 최근 5일]
+- 없음
+
+============================================
+[보고자 작성 의견]
+19일 04 UT 현재까지 24시간 이내에 발생한 뚜렷한 플레어나, Halo CME, 지자기 현상은 관측되지 않음. 플레어의 경우 C4 이하의 약한 플레어만이 관측되었으며, Kp 지수는 3이하이고 Dst 지수도 안정적으로 유지되는 것을 확인하였음. proton 또는 electron event도 별도로 관측되지 않음. 다만 17일에 발생한 halo CME가 20일 이후 도착할 수 있으며 태양 전면에 있던 코로나홀 영향이 21일 이후에 발생할 수 있음이 WSA-ENLIL 모형에서 예측되고 있음. 이에 따라 G1 현상이 발생할 수 있을 것으로 여겨지기 때문에 지속적으로 모니터링이 필요함.
