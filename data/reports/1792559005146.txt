@@ -1,0 +1,47 @@
+우주환경 리포트 (Space Weather Report)
+보고자: 강주형
+검토자: Yukinaga Miyashita
+
+작성 시각: 2026-10-21 04:57 UTC
+
+[최근 24시간 요약]
+항목                    | 최저   | 최대   | 평균   | 단위  
+----------------------|------|------|------|-----
+Kp                    | 1.0  | 3.7  | 2.4  | -   
+Dst                   | -53  | 4    | -19  | nT  
+Solar Wind Speed      | 319  | 459  | 371  | km/s
+Proton Density        | 2.6  | 40.5 | 10.1 | /cm³
+IMF Bz                | -9.9 | 7.0  | -1.2 | nT  
+Proton Flux (≥10 MeV) | 0.2  | 0.4  | 0.2  | pfu 
+
+[현재 지표]
+Planetary Kp: 3.7
+Dst Index: -36 nT
+Solar Wind Speed: 371 km/s
+Proton Density: 10.0 /cm³
+IMF Bz: -4.2 nT
+GOES X-ray Flux: 6.08e-7 W/m² (B6.1)
+Proton Flux (≥10 MeV): 0.2 pfu
+
+[NOAA Space Weather Scales]
+R (Radio Blackout): R0 · S (Solar Radiation Storm): S0 · G (Geomagnetic Storm): GNaN
+
+[CME - CACTUS 자동 검출, 최근 5일]
+- #0026 2026-10-20 14:24 UTC · 731km/s · PA319° · width24°
+- #0025 2026-10-20 09:12 UTC · 325km/s · PA32° · width14°
+- #0024 2026-10-20 09:00 UTC · 409km/s · PA322° · width50°
+- #0023 2026-10-20 07:24 UTC · 446km/s · PA322° · width30°
+- #0022 2026-10-20 04:36 UTC · 360km/s · PA340° · width14°
+
+[Solar Flare - NASA DONKI, 최근 7일]
+- 없음
+
+[Geomagnetic Storm - Kp 실시간 감지, 최근 5일]
+- 없음
+
+[Solar Proton Events - proton flux 실시간 감지, 최근 5일]
+- 없음
+
+============================================
+[보고자 작성 의견]
+21일 04UT 현재까지 24시간 동안 뚜렷한 플레어 활동은 없었다. 주목할 만한 건 17일에 있던 Halo CME 영향으로 Kp 지수는 현재 3.7까지 상승하였고 Dst 지수도 -50 nT 까지 떨어졌다. IMF Bz component 도 음의 값으로 나타나는 것으로 보아 CME가 지구에 들어왔다는 것을 알 수 있다. 태양풍 속도도 직전 330 km/s에서 440 km까지 상승했다가 떨어지는 것이 보이고 밀도와 온도 또한 이 기간 상승하였다. 현재까지는 지자기폭풍이 일어나지 않았지만 향후 24시간 동안은 꾸준한 모니터링이 필요하다고 생각된다.
